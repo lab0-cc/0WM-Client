@@ -1,0 +1,116 @@
+:host {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 100vw;
+    z-index: 100;
+}
+
+:host > .outer {
+    width: 100%;
+    height: 100%;
+    background: #0006;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+:host > .inner {
+    border-radius: 20px;
+    position: fixed;
+    top: calc(50% - (max(env(safe-area-inset-bottom), 20px) - max(env(safe-area-inset-top), 20px)) / 2);
+    left: calc(50% - (max(env(safe-area-inset-right), 20px) - max(env(safe-area-inset-left), 20px)) / 2);
+    border: 5px solid #fff;
+    background: #fffffff2;
+    box-sizing: border-box;
+    box-shadow: 0 2px 10px -5px #000, 0 0 0 calc(max(100vh, 100vw)) #0008;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+}
+
+:host > .inner > .choice {
+    padding: 10px;
+    cursor: pointer;
+}
+
+:host > .inner > .choice.disabled {
+    pointer-events: none;
+}
+
+:host > .inner > .choice:hover {
+    background: #ddd;
+}
+
+:host > .inner > .choice > * {
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+:host > .inner input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    margin: 0 10px 0 0;
+    background: #0001;
+    border: 1px solid #0002;
+    appearance: none;
+    border-radius: 10px;
+    box-sizing: content-box;
+    position: relative;
+}
+
+:host > .inner input[type="radio"]::after {
+    display: block;
+    position: absolute;
+}
+
+:host > .inner input[type="radio"]:checked::after {
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: #0008;
+    border-radius: 5px;
+    top: 4px;
+    left: 4px;
+}
+
+:host > .inner input[type="radio"]:disabled {
+    background: #0000;
+}
+
+:host > .inner input[type="radio"]:disabled::after {
+    content: "";
+    width: 14px;
+    height: 4px;
+    background: #0002;
+    top: 7px;
+    left: 2px;
+}
+
+:host > .inner > .choice > label {
+    display: inline-block;
+    width: calc(100% - 30px);
+}
+
+:host > .inner > .choice > label > * {
+    display: inline-block;
+    width: 100%;
+}
+
+:host > .inner > .choice > label > .title {
+    font-weight: 700;
+}
+
+:host > .inner > .choice > label > .description {
+    font-size: 14px;
+}
+
+:host > .inner input[type="radio"]:disabled + label {
+    color: #0003;
+}
+
+:host > .inner > .button {
+    text-align: center;
+    line-height: 50px;
+    cursor: pointer;
+}

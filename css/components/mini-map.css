@@ -1,0 +1,161 @@
+:host {
+    bottom: max(env(safe-area-inset-bottom), 20px);
+    right: max(env(safe-area-inset-right), 20px);
+    width: 150px;
+    height: 150px;
+    background: #fff0 !important;
+}
+
+:host(:not(.zoomed)) {
+    cursor: pointer;
+}
+
+:host(.zoomed) {
+    --size: calc(min(100vw - max(env(safe-area-inset-right), 20px) - max(env(safe-area-inset-left), 20px), 100vh - max(env(safe-area-inset-bottom), 20px) - max(env(safe-area-inset-top), 20px)));
+    width: var(--size);
+    height: var(--size);
+}
+
+:host::before {
+    content: "";
+    background: #fff9;
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: all .2s ease;
+}
+
+:host(:not(.zoomed):hover)::before {
+    background: #fffa;
+}
+
+:host(.zoomed)::before {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, calc(100% - 36px) 23px, calc(100% - 30px) 29px, calc(100% - 36px) 35px, calc(100% - 34px) 37px, calc(100% - 28px) 31px, calc(100% - 22px) 37px, calc(100% - 20px) 35px, calc(100% - 26px) 29px, calc(100% - 20px) 23px, calc(100% - 22px) 21px, calc(100% - 28px) 27px, calc(100% - 34px) 21px, calc(100% - 36px) 23px);
+}
+
+:host(.zoomed) > div {
+    display: block;
+}
+
+:host > canvas {
+    position: relative;
+}
+
+:host(.zooming) > canvas {
+    display: none;
+}
+
+:host(:not(.zoomed)) > map-scale {
+    display: none;
+}
+
+:host > .top-bar {
+    display: none;
+}
+
+:host > .top-bar > * {
+    position: absolute;
+    background: #fff8;
+    height: 36px;
+    border-radius: 18px;
+    box-shadow: 0 1px 3px -1px #000;
+    top: 10px;
+    font-size: 14px;
+}
+
+:host > .top-bar > .close {
+    width: 36px;
+    right: 10px;
+    cursor: pointer;
+    transition: all .2s ease;
+}
+
+:host > .top-bar > .close:hover {
+    background: #fff9;
+}
+
+:host > .top-bar > .close::before {
+    content: "";
+    clip-path: polygon(10px 13px, 16px 19px, 10px 25px, 12px 27px, 18px 21px, 24px 27px, 26px 25px, 20px 19px, 26px 13px, 24px 11px, 18px 17px, 12px 11px);
+    background: #0006;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+:host > .top-bar > .map-editor {
+    left: 10px;
+    height: 26px;
+    width: calc(var(--size) - 76px);
+    padding: 5px;
+    line-height: 24px;
+    overflow-x: auto;
+    white-space: nowrap;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+
+:host > .top-bar > .map-editor > .container {
+    position: relative;
+    min-width: 100%;
+    display: inline-block;
+}
+
+:host > .top-bar > .map-editor > .container > .section {
+    display: inline-block;
+    padding: 5px;
+    height: 100%;
+    box-sizing: border-box;
+    line-height: 24px;
+}
+
+:host > .top-bar > .map-editor > .container > * {
+    background: #fff8;
+    border-radius: 13px;
+    border: 1px solid #0002;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+:host > .top-bar > .map-editor > .container > .button, :host > .top-bar > .map-editor > .container > .select {
+    padding: 0 8px;
+    text-align: center;
+    cursor: pointer;
+}
+
+:host > .top-bar > .map-editor > .container > .select {
+    padding-right: 18px;
+    position: relative;
+}
+
+:host > .top-bar > .map-editor > .container > .select::after {
+    content: "";
+    border: 4px solid #0000;
+    width: 0;
+    height: 0;
+    display: block;
+    position: absolute;
+    right: 6px;
+    top: 10px;
+    border-top: 6px solid #000;
+}
+
+:host > .top-bar > .map-editor > .container > .select.incomplete {
+    font-style: italic;
+    color: #666;
+    padding: 0 19px 0 7px;
+}
+
+:host > .top-bar > .map-editor > .container > .right {
+    position: absolute;
+    right: 0;
+    width: 50px;
+    margin: 0;
+}
+
+:host > .top-bar > .map-editor > .container > .right ~ :last-child {
+    margin-right: 80px;
+}

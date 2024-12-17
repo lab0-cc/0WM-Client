@@ -1,0 +1,64 @@
+:host {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    width: 100px;
+    height: 9px;
+    background: #0004;
+    border-radius: 4px;
+    padding: 11px 1px;
+    overflow: hidden;
+    display: block;
+}
+
+:host > div {
+    width: 100px;
+    overflow: hidden;
+    white-space: nowrap;
+    height: 4px;
+}
+
+:host > .metric {
+    --current-width: var(--metric-width);
+}
+
+:host > .imperial {
+    --current-width: var(--imperial-width);
+    margin-top: 1px;
+}
+
+:host > div > div {
+    height: 4px;
+    width: var(--current-width);
+    display: inline-block;
+    vertical-align: top;
+}
+
+:host > div > div:nth-child(2n) {
+    background: #fff5;
+}
+
+:host > div > div:nth-child(2n+1) {
+    background: #fffb;
+}
+
+:host > div > div::after {
+    content: attr(data-scale) "m";
+    position: absolute;
+    display: block;
+    width: var(--current-width);
+    font-size: 10px;
+    text-align: center;
+    height: 11px;
+    color: #fff;
+}
+
+:host > .metric > div::after {
+    content: attr(data-scale) "m";
+    margin-top: -11px;
+}
+
+:host > .imperial > div::after {
+    content: attr(data-scale) "ft";
+    margin-top: 4px;
+}

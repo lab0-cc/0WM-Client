@@ -1,0 +1,9 @@
+[submodule "ext/context2d"]
+	path = ext/context2d
+	url = https://github.com/lab0-cc/Context2D.git
+[submodule "ext/linalg"]
+	path = ext/linalg
+	url = https://github.com/lab0-cc/linalg.git
+[submodule "ext/0js"]
+	path = ext/0js
+	url = https://github.com/lab0-cc/0JS

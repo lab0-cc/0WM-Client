@@ -1,0 +1,35 @@
+@font-face {
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 400;
+    src: url('/fonts/Roboto-Regular.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Roboto';
+    font-style: normal;
+    font-weight: 700;
+    src: url('/fonts/Roboto-Bold.ttf') format('truetype');
+}
+
+body {
+    font-family: 'Roboto';
+    background: #000;
+    font-size: 15px;
+    overflow: hidden;
+    user-select: none;
+}
+
+body > :not(modal-box, script) {
+    position: fixed;
+    border-radius: 20px;
+    box-shadow: 0 2px 10px -5px #000;
+    display: block;
+    transition: all .2s ease;
+    overflow: hidden;
+    background: #fff9;
+}
+
+body > :not(modal-box, script):hover {
+    background: #fffa;
+}

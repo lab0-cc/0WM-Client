@@ -1,0 +1,116 @@
+:host {
+    top: max(env(safe-area-inset-top), 20px);
+    left: max(env(safe-area-inset-left), 20px);
+    height: 110px;
+    width: 40px;
+    padding: 5px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+:host(.open) {
+    width: 250px;
+}
+
+:host > * {
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    position: relative;
+    line-height: 30px;
+    color: #fff0;
+    font-size: 14px;
+}
+
+:host(.open) > * {
+    padding-left: 35px;
+    padding-right: 5px;
+    width: 200px;
+    color: #fff;
+}
+
+:host > :not(:first-child) {
+    margin-top: 5px;
+}
+
+:host > .prompt {
+    background: #974;
+}
+
+:host > .granted {
+    background: #464;
+}
+
+:host > .denied {
+    background: #922;
+}
+
+:host > .unsupported {
+    background: #444;
+}
+
+:host > .active {
+    background: #247;
+}
+
+:host > .xr::before {
+    content: "";
+    width: 13px;
+    height: 13px;
+    border: solid 2px #fff;
+    border-radius: 70% 15%;
+    transform: rotate(45deg);
+    display: block;
+    position: absolute;
+    top: 7px;
+    left: 6px;
+}
+
+:host > .xr::after {
+    content: '';
+    display: block;
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border: solid 2px #fff;
+    border-radius: 50%;
+    left: 10px;
+    top: 11px;
+}
+
+:host > .planes::before {
+    content: "";
+    display: block;
+    width: 27px;
+    height: 22px;
+    transform: skew(0, -30deg) scale(0.45,0.7);
+    background: linear-gradient(#fff 2px, #fff0 2px) top/auto 5px, linear-gradient(to left, #fff 2px, #fff0 2px) right/5px;
+    position: absolute;
+    top: 3px;
+    left: -2px;
+}
+
+:host > .planes::after {
+    content: "";
+    display: block;
+    background: #fffd;
+    width: 30px;
+    height: 30px;
+    position: absolute;
+    top: 0;
+    clip-path: polygon(8px 20px, 8px 12px, 15px 8px, 26px 21px);
+    left: 0;
+}
+
+:host > .gps::before {
+    content: "";
+    display: block;
+    width: 16px;
+    height: 16px;
+    border-radius: 9px 9px 0px 9px;
+    position: absolute;
+    transform: rotate(45deg);
+    background: radial-gradient(circle at center, #fff0 4px, #fff 4.5px);
+    top: 6px;
+    left: 7px;
+}
