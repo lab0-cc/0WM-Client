@@ -4,6 +4,7 @@
     width: 150px;
     height: 150px;
     background: #fff0 !important;
+    z-index: 10001;
 }
 
 :host(:not(.zoomed)) {
