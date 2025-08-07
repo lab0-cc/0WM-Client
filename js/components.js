@@ -6,6 +6,7 @@
     }
 
     loadComponent('feature-indicators');
+    loadComponent('magic-wheel');
     loadComponent('map-scale');
     loadComponent('mini-map');
     loadComponent('modal-box');

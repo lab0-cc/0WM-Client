@@ -4,6 +4,7 @@ import { BoundedSurface3, Point2, Polygon2 } from '/js/linalg.mjs';
 
 export class Scene {
     #featureIndicators;
+    #magicWheel;
     #miniMap;
     #orientation;
     #path;
@@ -16,6 +17,8 @@ export class Scene {
         document.body.appendChild(this.#miniMap);
         this.#featureIndicators = document.createElement('feature-indicators');
         document.body.appendChild(this.#featureIndicators);
+        this.#magicWheel = document.createElement('magic-wheel');
+        document.body.appendChild(this.#magicWheel);
         this.#startModal = document.createElement('modal-box');
         this.#startModal.setAttribute('closable', 'no');
         this.#startModal.setAttribute('width', 180);
