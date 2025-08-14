@@ -10,4 +10,5 @@
     loadComponent('map-scale');
     loadComponent('mini-map');
     loadComponent('modal-box');
+    loadComponent('scan-progress');
 })();
