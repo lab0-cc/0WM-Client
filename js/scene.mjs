@@ -1,14 +1,22 @@
 // This module implements the application’s scene management
 
-import { BoundedSurface3, Point2, Polygon2 } from '/js/linalg.mjs';
+import { Context } from '/js/gl.mjs';
+import { createHUD } from '/js/hud.mjs';
+import { BoundedSurface3, Matrix4, Point2, Point3, Polygon2, Vector2 } from '/js/linalg.mjs';
+import { M } from '/js/meshes.mjs';
 
 export class Scene {
+    #ctx;
     #featureIndicators;
+    #m;
     #magicWheel;
+    #measurements;
     #miniMap;
     #orientation;
     #path;
+    #pose;
     #refSpace;
+    #session;
     #startModal;
 
     constructor() {
@@ -31,21 +39,21 @@ export class Scene {
 
         this.init = this.init.bind(this);
         start.addEventListener('click', this.init);
+        document.scene = this;
+        this.#measurements = [];
     }
 
     async #init() {
-        const session = await navigator.xr.requestSession('immersive-ar', {
+        this.#session = await navigator.xr.requestSession("immersive-ar", {
             requiredFeatures: ['local-floor', 'dom-overlay'],
             optionalFeatures: ['plane-detection'],
             domOverlay: { root: document.body }
         });
-
-        const gl = document.createElement('canvas').getContext('webgl', { xrCompatible: true });
-        session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
-
-        this.#refSpace = await session.requestReferenceSpace('local-floor');
-
-        session.requestAnimationFrame(this.#processFrame.bind(this));
+        this.#ctx = new Context(document.createElement('canvas'));
+        this.#m = new M(this.#ctx);
+        this.#ctx.attachTo(this.#session);
+        this.#refSpace = await this.#session.requestReferenceSpace('local-floor');
+        this.#session.requestAnimationFrame(this.#processFrame.bind(this));
     }
 
     init() {
@@ -72,38 +80,114 @@ export class Scene {
         this.#path.push(p);
     }
 
-    // Process an XR frame
-    #processFrame(time, frame) {
-        const pose = frame.getViewerPose(this.#refSpace);
-        if (pose !== null) {
-            let { x, z } = pose.transform.position;
-            this.#addPoint(new Point2(x, z));
-            this.#orientation = pose.transform.orientation;
+    // Draw the minimap data
+    #drawMiniMap(frame) {
+        let { x, z } = this.#pose.transform.position;
+        this.#addPoint(new Point2(x, z));
+        this.#orientation = this.#pose.transform.orientation;
 
-            const walls = [];
-            if (frame.detectedPlanes === undefined) {
-                this.#featureIndicators.update('planes', 'denied');
-            }
-            else {
-                this.#featureIndicators.update('planes', 'granted');
-                for (const plane of frame.detectedPlanes) {
-                    if (plane.polygon.length > 0) {
-                        const polygon = new Polygon2(plane.polygon.map(({z, x}) => new Point2(z, x)));
-                        const pose = frame.getPose(plane.planeSpace, this.#refSpace);
-                        const surf = new BoundedSurface3(polygon, pose.transform.matrix);
-                        // Filter out artifacts (non-vertical planes and small surfaces)
-                        if (surf.normal.y < .05 && surf.area() > 1 && surf.height() > 1) {
-                            const [min, max] = surf.lineProjection();
-                            walls.push([new Point2(min.x, min.z), new Point2(max.x, max.z)]);
-                        }
+        const walls = [];
+        if (frame.detectedPlanes === undefined) {
+            this.#featureIndicators.update('planes', 'denied');
+        }
+        else {
+            this.#featureIndicators.update('planes', 'granted');
+            for (const plane of frame.detectedPlanes) {
+                if (plane.polygon.length > 0) {
+                    const polygon = new Polygon2(plane.polygon.map(({z, x}) => new Point2(z, x)));
+                    const pose = frame.getPose(plane.planeSpace, this.#refSpace);
+                    const surf = new BoundedSurface3(polygon, pose.transform.matrix);
+                    // Filter out artifacts (non-vertical planes and small surfaces)
+                    if (surf.normal.y < .05 && surf.area() > 1 && surf.height() > 1) {
+                        const [min, max] = surf.lineProjection();
+                        walls.push([new Point2(min.x, min.z), new Point2(max.x, max.z)]);
                     }
                 }
             }
+        }
 
-            this.#miniMap.draw(this.#orientation, this.#path, walls);
+        this.#miniMap.draw(this.#orientation, this.#path, walls);
+    }
+
+    // Draw the measurements
+    #drawMeasurements() {
+        const glLayer = this.#session.renderState.baseLayer;
+        this.#ctx.bindFramebuffer(glLayer.framebuffer);
+
+        for(const view of this.#pose.views){
+            this.#ctx.updateViewport(glLayer.getViewport(view));
+
+            const proj = new Matrix4(view.projectionMatrix);
+            const viewMat = new Matrix4(view.transform.inverse.matrix);
+            const rot = new Matrix4(view.transform.matrix).rot();
+
+            let yaw = new Vector2(rot.l[5], rot.l[1]).angle();
+            const counterYaw = new Matrix4([
+                yaw.cos, -yaw.sin, 0, 0,
+                yaw.sin, yaw.cos,  0, 0,
+                0,       0,        1, 0,
+                0,       0,        0, 1
+            ]);
+            const camPos = new Point3(view.transform.position);
+
+            const sortedMeasurements = this.#measurements.reduce((acc, s) => {
+                s.camD2 = camPos.to(s.position).sqnorm();
+                if (s.camD2 > .05)
+                    acc.push(s);
+                return acc;
+            }, []).sort((a, b) => b.camD2 - a.camD2);
+
+            for (const measurement of sortedMeasurements) {
+                const hudMat = viewMat.mul(rot.mul(counterYaw).translated(measurement.position));
+                // First, draw a sphere
+                this.#m.mSphere.use(this.#m.pSphere, {
+                    projectionMatrix: proj,
+                    modelViewMatrix: viewMat.mul(measurement.position.trans4()),
+                    color: [.2, .7, 1.0],
+                    alpha: .5
+                }).draw();
+                // Then draw lines
+                this.#m.mLines.use(this.#m.pLines, {
+                    projectionMatrix: proj,
+                    color: [1, 1, 1],
+                    alpha: 1,
+                    modelViewMatrix: hudMat
+                }).draw('lineStrip');
+                // Then draw the info box
+                this.#m.mInfo.use(this.#m.pInfo, {
+                    UV: this.#m.uvInfo,
+                    projectionMatrix: proj,
+                    modelViewMatrix: hudMat,
+                    texture: measurement.texture
+                }).draw('triangleStrip');
+            }
+        }
+    }
+
+    // Process an XR frame
+    #processFrame(time, frame) {
+        this.#pose = frame.getViewerPose(this.#refSpace);
+        if (this.#pose !== null) {
+            this.#drawMiniMap(frame);
+            this.#drawMeasurements();
         }
 
         frame.session.requestAnimationFrame(this.#processFrame.bind(this));
+    }
+
+    // Request a Wi-Fi scan
+    requestMeasurement() {
+        // For now, this is a dumb mock
+        if(!this.#pose) return;
+        const canvas = createHUD([
+            {ssid: "Network 1", signal: -54, mhz: 2400},
+            {ssid: "Network 2", signal: -65, mhz: 5100},
+            {ssid: "Network 3 foo bar baz", signal: -83, mhz: 2400}
+        ]);
+        this.#measurements.push({
+            position: new Point3(this.#pose.transform.position),
+            texture: this.#ctx.create2DTexture(canvas, 'clamp')
+        });
     }
 
     #processGPS(pos) {

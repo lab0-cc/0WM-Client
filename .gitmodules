@@ -7,3 +7,6 @@
 [submodule "ext/0js"]
 	path = ext/0js
 	url = https://github.com/lab0-cc/0JS
+[submodule "ext/0GL"]
+	path = ext/0GL
+	url = https://github.com/lab0-cc/0GL
