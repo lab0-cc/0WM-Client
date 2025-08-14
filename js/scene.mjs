@@ -3,9 +3,14 @@
 import { Context } from '/js/gl.mjs';
 import { createHUD } from '/js/hud.mjs';
 import { BoundedSurface3, Matrix4, Point2, Point3, Polygon2, Vector2 } from '/js/linalg.mjs';
+import { mad, med } from '/js/math.mjs';
 import { M } from '/js/meshes.mjs';
+import { createElement } from '/js/util.mjs';
+import { WS } from '/js/ws.mjs';
 
 export class Scene {
+    #ap;
+    #apRounds;
     #ctx;
     #featureIndicators;
     #m;
@@ -17,28 +22,25 @@ export class Scene {
     #pose;
     #refSpace;
     #session;
-    #startModal;
+    #ws;
 
     constructor() {
         this.#path = [];
-        this.#miniMap = document.createElement('mini-map');
+        this.#miniMap = createElement('mini-map');
         document.body.appendChild(this.#miniMap);
-        this.#featureIndicators = document.createElement('feature-indicators');
+        this.#featureIndicators = createElement('feature-indicators');
         document.body.appendChild(this.#featureIndicators);
-        this.#magicWheel = document.createElement('magic-wheel');
+        this.#magicWheel = createElement('magic-wheel');
         document.body.appendChild(this.#magicWheel);
-        this.#startModal = document.createElement('modal-box');
-        this.#startModal.setAttribute('closable', 'no');
-        this.#startModal.setAttribute('width', 180);
-        this.#startModal.setAttribute('height', 60);
-        const start = document.createElement('div');
-        start.className = 'button';
-        start.textContent = 'Click here to start';
-        this.#startModal.appendChild(start);
-        document.body.appendChild(this.#startModal);
-
-        this.init = this.init.bind(this);
-        start.addEventListener('click', this.init);
+        const startModal = createElement('modal-box', null, {closable: 'no'});
+        const start = createElement('div', 'button', null, 'Click here to start');
+        startModal.appendChild(start);
+        document.body.appendChild(startModal);
+        start.addEventListener('click', () => {
+            startModal.remove();
+            this.init();
+        });
+        document.body.appendChild(createElement('span', null, {id: 'ap'}, '<No reachable AP>'));
         document.scene = this;
         this.#measurements = [];
     }
@@ -49,11 +51,19 @@ export class Scene {
             optionalFeatures: ['plane-detection'],
             domOverlay: { root: document.body }
         });
-        this.#ctx = new Context(document.createElement('canvas'));
+        this.#ctx = new Context(createElement('canvas'));
         this.#m = new M(this.#ctx);
         this.#ctx.attachTo(this.#session);
         this.#refSpace = await this.#session.requestReferenceSpace('local-floor');
         this.#session.requestAnimationFrame(this.#processFrame.bind(this));
+    }
+
+    #spawnMessage(id, message) {
+        const modal = createElement('modal-box', null, {closable: 'no', id});
+        const msg = createElement('span', null, null, message);
+        modal.appendChild(msg);
+        document.body.appendChild(modal);
+        return [modal, msg];
     }
 
     init() {
@@ -63,9 +73,56 @@ export class Scene {
             this.#featureIndicators.update('planes', 'denied');
         });
 
-        this.#startModal.remove();
-
         navigator.geolocation.watchPosition(this.#processGPS.bind(this), null, { enableHighAccuracy: true, timeout: 5000 });
+
+        this.#spawnMessage('connect-ws', 'Connecting to the server…');
+        this.#initWS();
+        this.#initAP();
+    }
+
+    #initWS() {
+        this.#ws = new WS('http://127.0.0.1:8000/api/ws');
+        this.#ws.addEventListener('message', e => {
+          const [command, data] = e.data.split('\x00');
+          this.#wsCallback(command, JSON.parse(data));
+        });
+        this.#ws.addEventListener('open', () => document.getElementById('connect-ws')?.remove());
+        this.#ws.addEventListener('close', () => {
+          if (document.getElementById('connect-ws') === null)
+            this.#spawnMessage('connect-ws', 'Connection lost. Reconnecting to the server…');
+        });
+    }
+
+    #pingAP(host) {
+        document.getElementById('connect-ap')?.remove();
+        const [modal, msg] = this.#spawnMessage('connect-ap', `Contacting the AP (${host})…`);
+        return fetch(`${host}/cgi-bin/info`).then(r => r.json().then(data => {
+            const model = data.model;
+            msg.textContent = `Listing radios (${host})…`;
+            return fetch(`${host}/cgi-bin/list`).then(r => r.json().then(data => {
+                document.getElementById('ap').textContent = model;
+                const names = Object.keys(data);
+                this.#ap = { host, model, radios: Object.fromEntries(names.map(e => [e, []])) };
+                msg.textContent = `Calibrating radios (${host}, [${names.join(', ')}])…`;
+                // TODO: show more context, i.e. when a single radio has finished.
+                const start = performance.now();
+                return Promise.all(names.map(name => {
+                    return fetch(`${host}/cgi-bin/scan/${name}`)
+                           .then(r => r.arrayBuffer().then (() => {
+                        this.#ap.radios[name].push(performance.now() - start);
+                    }));
+                })).then(() => {
+                    modal.remove();
+                    this.#apRounds = 0;
+                });
+            }));
+        }));
+    }
+
+    #initAP() {
+        this.#ap = null;
+        this.#apRounds = 0;
+        this.#pingAP('http://ap.local').catch(this.#ws.send('NOAP'));
     }
 
     // Add a point to the path
@@ -177,17 +234,76 @@ export class Scene {
 
     // Request a Wi-Fi scan
     requestMeasurement() {
-        // For now, this is a dumb mock
         if(!this.#pose) return;
-        const canvas = createHUD([
-            {ssid: "Network 1", signal: -54, mhz: 2400},
-            {ssid: "Network 2", signal: -65, mhz: 5100},
-            {ssid: "Network 3 foo bar baz", signal: -83, mhz: 2400}
-        ]);
-        this.#measurements.push({
-            position: new Point3(this.#pose.transform.position),
-            texture: this.#ctx.create2DTexture(canvas, 'clamp')
+        const progress = createElement('scan-progress');
+        document.body.appendChild(progress);
+        const start = performance.now();
+        // TODO: handle disconnection
+        // TODO: fail if the user moves too much
+        Promise.all(Object.entries(this.#ap.radios).map(([name, times]) => {
+            progress.add(name);
+            const median = med(times);
+            const t90 = .9 * median;
+            const r0 = .1 * median;
+            const tau = r0 * (1 + (1.4826 * mad(times, median) / median)) / Math.log(r0 / 50);
+            const interval = setInterval(() => {
+                const elapsed = performance.now() - start;
+                let p
+                if (elapsed < t90)
+                    p = elapsed / median;
+                else
+                    p = 1 - .1 * Math.exp((t90 - elapsed) / tau);
+                progress.set(name, p);
+            }, 50);
+            return fetch(`${this.#ap.host}/cgi-bin/scan/${name}`).then(r => r.json().then(data => {
+                this.#ap.radios[name].push(performance.now() - start);
+                progress.done(name);
+                return data.results;
+            })).finally(() => clearInterval(interval));
+        })).then(l => {
+            progress.remove();
+            const {x, y, z} = this.#pose.transform.position;
+            const scan = {position: {x, y, z}, timestamp: Date.now(), measurements: l.flat()};
+            this.#ws.send(`SCAN\x00${JSON.stringify(scan, null, null)}`);
         });
+    }
+
+    #wsCallback(command, data) {
+        switch (command) {
+        case 'DISP':
+            const canvas = createHUD(data.measurements);
+            this.#measurements.push({
+                position: new Point3(data.position),
+                texture: this.#ctx.create2DTexture(canvas, 'clamp')
+            });
+            break;
+        case 'TRYL':
+            (async () => {
+              for (const host of data) {
+                  try {
+                      await this.#pingAP(host).catch();
+                      return;
+                  }
+                  catch {}
+              }
+              if (++this.#apRounds >= 3) {
+                  const modal = createElement('modal-box', null, {closable: 'no'});
+                  const retry = createElement('div', 'button', null,
+                                              'Failed to join the AP. Click here to retry.');
+                  modal.appendChild(retry);
+                  document.body.appendChild(modal);
+                  document.getElementById('connect-ap')?.remove();
+                  retry.addEventListener('click', () => {
+                      modal.remove();
+                      this.#initAP();
+                  });
+              }
+              else {
+                  this.#ws.send('NOAP');
+              }
+            })();
+            break;
+        }
     }
 
     #processGPS(pos) {
