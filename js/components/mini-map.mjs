@@ -294,7 +294,7 @@ class MiniMap extends Stylable(HTMLElement) {
         this.#savedWalls = walls;
 
         // Reset the context
-        this.#ctx.clearRect(0, 0, this.#canvas.width, this.#canvas.height);
+        this.#ctx.clearRect(new Point2(0, 0), new Vector2(this.#canvas.width, this.#canvas.height));
         this.#ctx.lineCap = 'round';
         this.#ctx.lineJoin = 'round';
 
@@ -305,7 +305,7 @@ class MiniMap extends Stylable(HTMLElement) {
                                factor * angle.cos,
                                this.#canvas.width / 2 + (this.#mapOrigin.x - this.#center.x) * this.#scale,
                                this.#canvas.height / 2 + (this.#mapOrigin.y - this.#center.y) * this.#scale);
-        this.#ctx.drawImage(this.#mapImage, 0, 0, this.#mapImage.width, this.#mapImage.height);
+        this.#ctx.drawImage(this.#mapImage, new Point2(0, 0), new Vector2(this.#mapImage.width, this.#mapImage.height));
 
         // Switch to a simple viewport homothety
         this.#ctx.setTransform(this.#scale, 0, 0, this.#scale,
