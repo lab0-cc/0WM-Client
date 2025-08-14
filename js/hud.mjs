@@ -20,7 +20,7 @@ function drawBars(ctx, y, level) {
 
 
 // Print network data
-function printNetwork(ctx, ssid, y, signal, frequency) {
+function printNetwork(ctx, ssid, y, signal, band) {
     let level;
     if (signal <= -80)
         level = 1;
@@ -33,20 +33,25 @@ function printNetwork(ctx, ssid, y, signal, frequency) {
     }
 
     let freq;
-    if (frequency < 5000)
+    if (band == 2)
         freq = 2.4;
-    else if (frequency < 6000)
-        freq = 5;
     else
-        freq = 6;
+        freq = band;
 
+    if (ssid === null) {
+        ctx.font = "italic 19px Roboto";
+        ssid = "<no name>";
+    }
+    else {
+        ctx.font = "19px Roboto";
+    }
     ctx.fillText(ssid, 10, 25 + 22 * y, 120);
-    ctx.font="10px Roboto";
+
+    ctx.font = "10px Roboto";
     ctx.textAlign = "center";
     ctx.fillText(`${freq}GHz`, 178, 15 + 22 * y, 40);
     ctx.fillText(`${signal}dB`, 178, 25 + 22 * y, 40);
     drawBars(ctx, y, level);
-    ctx.font="19px Roboto";
     ctx.textAlign = "start";
 }
 
@@ -57,11 +62,10 @@ export function createHUD(data) {
     canvas.width = 200;
     canvas.height = 80;
     const ctx = canvas.getContext('2d');
-    ctx.font = "19px Roboto";
     ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.roundRect(0, 0, canvas.width, canvas.height, 10);
     ctx.fill();
     ctx.fillStyle = "#fff";
-    data.slice(0, 3).forEach(({ssid, signal, mhz}, i) => printNetwork(ctx, ssid, i, signal, mhz));
+    data.slice(0, 3).forEach(({ssid, signal, band}, i) => printNetwork(ctx, ssid, i, signal, band));
     return canvas
 }
