@@ -109,8 +109,12 @@
     color: #0003;
 }
 
-:host > .inner > .button {
+:host > .inner > span, :host > .inner > .button {
     text-align: center;
-    line-height: 50px;
+    line-height: 30px;
+    padding: 10px;
+}
+
+:host > .inner > .button {
     cursor: pointer;
 }

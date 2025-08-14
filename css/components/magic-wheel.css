@@ -3,7 +3,7 @@
     height: 150px;
     z-index: 10000;
     border-radius: 75px !important;
-    right: -50px;
+    right: calc(max(env(safe-area-inset-right), 20px) - 70px);
     bottom: calc(max(50vh - 75px, 200px));
 }
 
