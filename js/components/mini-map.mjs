@@ -326,7 +326,7 @@ class MiniMap extends Stylable(HTMLElement) {
                 colors.push(`rgb(0 0 255 / ${alpha})`);
             }
 
-            this.#ctx.strokeGradient(path, colors);
+            this.#ctx.strokeGradient(path.toReversed(), colors);
         }
 
         // Draw the walls
