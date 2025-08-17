@@ -9,10 +9,10 @@
     background: #000a;
     z-index: 10001;
     font-size: 17px;
-    border-left-width: calc(max(env(safe-area-inset-left), 2px));
-    border-top-width: max(env(safe-area-inset-top), 2px);
-    border-right-width: max(env(safe-area-inset-right), 2px);
-    border-bottom-width: max(env(safe-area-inset-bottom), 2px);
+    border-left-width: env(safe-area-inset-left);
+    border-top-width: env(safe-area-inset-top);
+    border-right-width: env(safe-area-inset-right);
+    border-bottom-width: env(safe-area-inset-bottom);
 }
 
 :host::before {
@@ -42,7 +42,7 @@
     content: attr(data-radio);
     display: block;
     position: absolute;
-    top: -12px;
+    top: -11px;
     transform: translateX(-50%);
     background: #0008;
     text-align: center;
