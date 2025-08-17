@@ -8,8 +8,9 @@ import { M } from '/js/meshes.mjs';
 import { createElement } from '/js/util.mjs';
 import { WS } from '/js/ws.mjs';
 
-export class Scene {
+export class App {
     #ap;
+    #api;
     #apRounds;
     #ctx;
     #featureIndicators;
@@ -37,14 +38,18 @@ export class Scene {
         const start = createElement('div', 'button', null, 'Click here to start');
         startModal.appendChild(start);
         document.body.appendChild(startModal);
-        start.addEventListener('click', () => {
-            startModal.remove();
-            this.init();
-        });
         document.body.appendChild(createElement('span', null, {id: 'ap'}, '<No reachable AP>'));
         document.scene = this;
         this.#measurements = [];
         this.#uuid = null;
+
+        fetch('/config.json').then(r => r.json().then(data => {
+            this.#api = data.api;
+            start.addEventListener('click', () => {
+                startModal.remove();
+                this.init();
+            });
+        }));
     }
 
     async #init() {
@@ -90,7 +95,7 @@ export class Scene {
     }
 
     #initWS() {
-        this.#ws = new WS('http://127.0.0.1:8000/api/ws');
+        this.#ws = new WS(`${this.#api}/ws`);
         this.#ws.addEventListener('message', e => {
             const [command, data] = e.data.split('\x00');
             this.#wsCallback(command, JSON.parse(data));
