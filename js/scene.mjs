@@ -22,6 +22,7 @@ export class Scene {
     #pose;
     #refSpace;
     #session;
+    #uuid;
     #ws;
 
     constructor() {
@@ -43,6 +44,7 @@ export class Scene {
         document.body.appendChild(createElement('span', null, {id: 'ap'}, '<No reachable AP>'));
         document.scene = this;
         this.#measurements = [];
+        this.#uuid = null;
     }
 
     async #init() {
@@ -80,16 +82,26 @@ export class Scene {
         this.#initAP();
     }
 
+    #sendWS(cmd, arg = null) {
+        if (arg === null)
+            this.#ws.send(cmd);
+        else
+            this.#ws.send(`${cmd}\x00${JSON.stringify(arg, null, null)}`);
+    }
+
     #initWS() {
         this.#ws = new WS('http://127.0.0.1:8000/api/ws');
         this.#ws.addEventListener('message', e => {
-          const [command, data] = e.data.split('\x00');
-          this.#wsCallback(command, JSON.parse(data));
+            const [command, data] = e.data.split('\x00');
+            this.#wsCallback(command, JSON.parse(data));
         });
-        this.#ws.addEventListener('open', () => document.getElementById('connect-ws')?.remove());
+        this.#ws.addEventListener('open', async () => {
+            this.#sendWS('INIT', this.#uuid);
+            document.getElementById('connect-ws')?.remove();
+        });
         this.#ws.addEventListener('close', () => {
-          if (document.getElementById('connect-ws') === null)
-            this.#spawnMessage('connect-ws', 'Connection lost. Reconnecting to the server…');
+            if (document.getElementById('connect-ws') === null)
+                this.#spawnMessage('connect-ws', 'Connection lost. Reconnecting to the server…');
         });
     }
 
@@ -122,7 +134,7 @@ export class Scene {
     #initAP() {
         this.#ap = null;
         this.#apRounds = 0;
-        this.#pingAP('http://ap.local').catch(this.#ws.send('NOAP'));
+        this.#pingAP('http://ap.local').catch(this.#sendWS('NOAP'));
     }
 
     // Add a point to the path
@@ -264,7 +276,7 @@ export class Scene {
             progress.remove();
             const {x, y, z} = this.#pose.transform.position;
             const scan = {position: {x, y, z}, timestamp: Date.now(), measurements: l.flat()};
-            this.#ws.send(`SCAN\x00${JSON.stringify(scan, null, null)}`);
+            this.#sendWS('SCAN', scan);
         });
     }
 
@@ -299,9 +311,12 @@ export class Scene {
                   });
               }
               else {
-                  this.#ws.send('NOAP');
+                  this.#sendWS('NOAP');
               }
             })();
+            break;
+        case 'UUID':
+            this.#uuid = data;
             break;
         }
     }
