@@ -60,7 +60,7 @@ class MiniMap extends Stylable(HTMLElement) {
         // in the body, with a hidden visibility to force loading and proper sizing (which we will
         // correct later).
         // TODO: custom loading
-        this.#mapImage = createElement('img', null, { src: '/B01.svg' });
+        this.#mapImage = createElement('img', null, { src: '/placeholder.svg' });
         this.#mapImage.style.visibility = 'hidden';
         document.body.appendChild(this.#mapImage);
 
