@@ -1,7 +1,7 @@
 // This module implements the minimap features of the webapp
 
 import { Context2D } from '/js/context2d.mjs';
-import { Angle2, Point2, Polygon2, Quaternion, Vector2 } from '/js/linalg.mjs';
+import { Angle2, BoundingBox2, Point2, Polygon2, Quaternion, Vector2 } from '/js/linalg.mjs';
 import { Stylable } from '/js/mixins.mjs';
 import { createElement } from '/js/util.mjs';
 
@@ -41,6 +41,8 @@ class MiniMap extends Stylable(HTMLElement) {
     #savedMapAngle;
     #mapFactor;
     #savedMapFactor;
+    #heatmap;
+    #heatmapBB;
 
     constructor() {
         super();
@@ -96,6 +98,8 @@ class MiniMap extends Stylable(HTMLElement) {
         this.#savedMapAngle = this.#mapAngle;
         this.#mapFactor = 10;
         this.#savedMapFactor = 10;
+
+        this.#heatmap = null;
 
         this.addStylesheet('components/mini-map.css');
 
@@ -312,6 +316,13 @@ class MiniMap extends Stylable(HTMLElement) {
                                this.#canvas.width / 2 - this.#center.x * this.#scale,
                                this.#canvas.height / 2 - this.#center.y * this.#scale);
 
+        if (this.#heatmap !== null) {
+            this.#ctx.globalCompositeOperation = 'darken';
+		    this.#ctx.drawImage(this.#heatmap, this.#heatmapBB.min,
+                                new Vector2(this.#heatmapBB.width(), this.#heatmapBB.height()));
+            this.#ctx.globalCompositeOperation = 'source-over';
+        }
+
         // If we have a path to show, do it
         if (path.length > 1) {
             this.#ctx.lineWidth = this.#pathWidth;
@@ -361,6 +372,20 @@ class MiniMap extends Stylable(HTMLElement) {
 
     #redraw() {
         this.draw(this.#savedOrientation, this.#savedPath, this.#savedWalls);
+    }
+
+    // Attach a heatmap to the minimap
+    attachHeatmap(svg, bb) {
+        const img = new Image();
+        if (this.#heatmap !== null) {
+            URL.revokeObjectURL(this.#heatmap.src);
+        }
+        img.addEventListener('load', async () => {
+            this.#heatmap = img;
+            this.#heatmapBB = new BoundingBox2(bb.min, bb.max);
+            this.#redraw();
+        });
+        img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     }
 }
 

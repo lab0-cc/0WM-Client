@@ -293,6 +293,10 @@ export class App {
                 position: new Point3(data.position),
                 texture: this.#ctx.create2DTexture(canvas, 'clamp')
             });
+            this.#sendWS('RQHT');
+            break;
+        case 'HEAT':
+            this.#miniMap.attachHeatmap(data[0], data[1]);
             break;
         case 'TRYL':
             (async () => {
