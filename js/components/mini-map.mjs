@@ -47,7 +47,8 @@ class MiniMap extends Stylable(HTMLElement) {
     constructor() {
         super();
 
-        this.#canvas = createElement('canvas', null, { height: 150, width: 150 });
+        const width = 150 * (window.devicePixelRatio || 1);
+        this.#canvas = createElement('canvas', null, { height: width, width });
         this.appendToShadow(this.#canvas);
         this.#ctx = this.#canvas.getContext('2d');
         Object.setPrototypeOf(this.#ctx, Context2D.prototype);
@@ -209,10 +210,10 @@ class MiniMap extends Stylable(HTMLElement) {
     }
 
     // Resize the viewport depending on the displayed elements
-    #updateViewport(viewport) {
+    #updateViewport(viewport, ratio) {
         this.#center = viewport.center();
-        const scale = Math.min(20, .8 * this.#canvas.width / viewport.width(),
-                                   .8 * this.#canvas.height / viewport.height());
+        const scale = Math.min(20, .8 * this.#canvas.width / (ratio * viewport.width()),
+                                   .8 * this.#canvas.height / (ratio * viewport.height()));
         if (this.#scale !== scale) {
             this.#scale = scale;
             this.#mapScale.setAttribute('scale', scale);
@@ -242,7 +243,7 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Update the minimap canvas after zoom/unzoom transition
     #resize() {
-        const width = window.getComputedStyle(this).width.slice(0, -2);
+        const width = window.getComputedStyle(this).width.slice(0, -2) * (window.devicePixelRatio || 1);
         this.#canvas.height = width;
         this.#canvas.width = width;
         this.#redraw();
@@ -290,7 +291,9 @@ class MiniMap extends Stylable(HTMLElement) {
     // Draw the scene on the minimap
     draw(orientation, path, walls=[]) {
         // Precompute the viewport dimensions
-        this.#updateViewport(new Polygon2(path.concat(walls.flat())).boundingBox());
+        const ratio = window.devicePixelRatio || 1;
+        this.#updateViewport(new Polygon2(path.concat(walls.flat())).boundingBox(), ratio);
+        const scale = this.#scale * ratio;
 
         // Save the current data for redraws
         this.#savedOrientation = orientation;
@@ -304,17 +307,17 @@ class MiniMap extends Stylable(HTMLElement) {
 
         // Compute the transformation matrix for the floor plan
         const angle = new Angle2(this.#mapAngle);
-        const factor = this.#mapFactor * this.#scale / this.#mapImage.width;
+        const factor = this.#mapFactor * scale / this.#mapImage.width;
         this.#ctx.setTransform(factor * angle.cos, factor * angle.sin, -factor * angle.sin,
                                factor * angle.cos,
-                               this.#canvas.width / 2 + (this.#mapOrigin.x - this.#center.x) * this.#scale,
-                               this.#canvas.height / 2 + (this.#mapOrigin.y - this.#center.y) * this.#scale);
+                               this.#canvas.width / 2 + (this.#mapOrigin.x - this.#center.x) * scale,
+                               this.#canvas.height / 2 + (this.#mapOrigin.y - this.#center.y) * scale);
         this.#ctx.drawImage(this.#mapImage, new Point2(0, 0), new Vector2(this.#mapImage.width, this.#mapImage.height));
 
         // Switch to a simple viewport homothety
-        this.#ctx.setTransform(this.#scale, 0, 0, this.#scale,
-                               this.#canvas.width / 2 - this.#center.x * this.#scale,
-                               this.#canvas.height / 2 - this.#center.y * this.#scale);
+        this.#ctx.setTransform(scale, 0, 0, scale,
+                               this.#canvas.width / 2 - this.#center.x * scale,
+                               this.#canvas.height / 2 - this.#center.y * scale);
 
         if (this.#heatmap !== null) {
             this.#ctx.globalCompositeOperation = 'darken';

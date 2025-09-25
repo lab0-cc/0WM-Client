@@ -43,6 +43,7 @@
 
 :host > canvas {
     position: relative;
+    width: 100%;
 }
 
 :host(.zooming) > canvas {
