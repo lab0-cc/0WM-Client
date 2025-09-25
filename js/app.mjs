@@ -5,7 +5,7 @@ import { createHUD } from '/js/hud.mjs';
 import { BoundedSurface3, Matrix4, Point2, Point3, Polygon2, Vector2 } from '/js/linalg.mjs';
 import { mad, med } from '/js/math.mjs';
 import { M } from '/js/meshes.mjs';
-import { createElement } from '/js/util.mjs';
+import { createElement, jfetch } from '/js/util.mjs';
 import { WS } from '/js/ws.mjs';
 
 export class App {
@@ -43,13 +43,13 @@ export class App {
         this.#measurements = [];
         this.#uuid = null;
 
-        fetch('/config.json').then(r => r.json().then(data => {
+        jfetch('/config.json', data => {
             this.#api = data.api;
             start.addEventListener('click', () => {
                 startModal.remove();
                 this.init();
             });
-        }));
+        });
     }
 
     async #init() {
@@ -113,10 +113,10 @@ export class App {
     #pingAP(host) {
         document.getElementById('connect-ap')?.remove();
         const [modal, msg] = this.#spawnMessage('connect-ap', `Contacting the AP (${host})…`);
-        return fetch(`${host}/cgi-bin/info`).then(r => r.json().then(data => {
+        return jfetch(`${host}/cgi-bin/info`, data => {
             const model = data.model;
             msg.textContent = `Listing radios (${host})…`;
-            return fetch(`${host}/cgi-bin/list`).then(r => r.json().then(data => {
+            return jfetch(`${host}/cgi-bin/list`, data => {
                 document.getElementById('ap').textContent = model;
                 const names = Object.keys(data);
                 this.#ap = { host, model, radios: Object.fromEntries(names.map(e => [e, []])) };
@@ -132,8 +132,8 @@ export class App {
                     modal.remove();
                     this.#apRounds = 0;
                 });
-            }));
-        }));
+            });
+        });
     }
 
     #initAP() {
@@ -272,11 +272,11 @@ export class App {
                     p = 1 - .1 * Math.exp((t90 - elapsed) / tau);
                 progress.set(name, p);
             }, 50);
-            return fetch(`${this.#ap.host}/cgi-bin/scan/${name}`).then(r => r.json().then(data => {
+            return jfetch(`${this.#ap.host}/cgi-bin/scan/${name}`, data => {
                 this.#ap.radios[name].push(performance.now() - start);
                 progress.done(name);
                 return data.results;
-            })).finally(() => clearInterval(interval));
+            }).finally(() => clearInterval(interval));
         })).then(l => {
             progress.remove();
             const {x, y, z} = this.#pose.transform.position;
