@@ -339,4 +339,8 @@ export class App {
         this.#featureIndicators.update('gps', 'granted');
         this.#featureIndicators.activate('gps');
     }
+
+    api() {
+        return this.#api;
+    }
 }

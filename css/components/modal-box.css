@@ -118,3 +118,51 @@
 :host > .inner > .button {
     cursor: pointer;
 }
+
+:host > .inner > .map-items {
+    width: calc(100% + 50px);
+    position: relative;
+    left: -5px;
+    top: -5px;
+    margin-bottom: -10px;
+    max-height: 350px;
+    scrollbar-gutter: stable;
+    overflow: auto;
+}
+
+:host > .inner > .map-items > .map-item {
+    background: #fff;
+    width: 80px;
+    height: 80px;
+    position: relative;
+    border: 5px solid #eee;
+    display: inline-block;
+    margin: 5px;
+    border-radius: 15px;
+    vertical-align: bottom;
+    cursor: pointer;
+}
+
+:host > .inner > .map-items > .map-item > img {
+    max-width: 100%;
+    max-height: calc(100% - 15px);
+    top: 0;
+    bottom: 15px;
+    position: absolute;
+    margin: auto;
+    left: 0;
+    right: 0;
+}
+
+:host > .inner > .map-items > .map-item > div {
+    bottom: 0;
+    position: absolute;
+    width: calc(100% - 10px);
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    left: 5px;
+}

@@ -3,7 +3,7 @@
 import { Context2D } from '/js/context2d.mjs';
 import { Angle2, BoundingBox2, Point2, Polygon2, Quaternion, Vector2 } from '/js/linalg.mjs';
 import { Stylable } from '/js/mixins.mjs';
-import { createElement } from '/js/util.mjs';
+import { createElement, jfetch } from '/js/util.mjs';
 
 const MODES = [{ id: 'manual', title: 'Manual mode', description: 'Fully manual map positioning' },
                { id: 'assisted', title: 'Assisted mode', description: 'The server helps you select a floor plan (requires GPS)' },
@@ -30,6 +30,8 @@ class MiniMap extends Stylable(HTMLElement) {
     //-- Placement modes
     #currentMode;
     #modeSelector;
+    //-- Floor plan browser
+    #mapSelector;
     //-- Touch variables
     #trackedTouches;
     #additionalTouches;
@@ -77,13 +79,14 @@ class MiniMap extends Stylable(HTMLElement) {
         container.appendChild(editBtn);
         this.#modeSelector = createElement('div', 'select');
         container.appendChild(this.#modeSelector);
-        const mapSelector = createElement('div', 'select incomplete');
-        mapSelector.textContent = 'No map selected';
-        container.appendChild(mapSelector);
+        this.#mapSelector = createElement('div', 'select incomplete');
+        this.#mapSelector.textContent = 'No map selected';
+        container.appendChild(this.#mapSelector);
         editor.appendChild(container);
         topBar.appendChild(editor);
         this.#modeSelector.addEventListener('click', this.#editMode.bind(this));
         this.#setMode(MODES[0]);
+        this.#mapSelector.addEventListener('click', this.#browseFloorplans.bind(this));
 
         const closeBtn = createElement('div', 'close');
         topBar.appendChild(closeBtn);
@@ -285,6 +288,30 @@ class MiniMap extends Stylable(HTMLElement) {
                 choice.classList.add('disabled');
             }
         }
+        document.body.appendChild(modal);
+    }
+
+    // Browse the available floorplans
+    #browseFloorplans() {
+        const modal = createElement('modal-box', null, { width: 300 });
+        const items = createElement('div', 'map-items');
+        modal.appendChild(items);
+        const api = window.app.api();
+        jfetch(`${api}/maps?recurse`, data => {
+            for (const { name, path } of Object.values(data)) {
+                const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
+                const item = createElement('div', 'map-item');
+                item.appendChild(createElement('img', null, { src, alt: name }));
+                item.appendChild(createElement('div', null, null, name));
+                item.addEventListener('click', () => {
+                    this.#mapImage.src = `${api}/${path}`;
+                    this.#mapSelector.textContent = name;
+                    this.#mapSelector.classList.remove('incomplete');
+                    modal.remove();
+                })
+                items.appendChild(item);
+            }
+        });
         document.body.appendChild(modal);
     }
 
