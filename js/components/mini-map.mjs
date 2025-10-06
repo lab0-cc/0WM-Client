@@ -1,7 +1,7 @@
 // This module implements the minimap features of the webapp
 
 import { Context2D } from '/js/context2d.mjs';
-import { Angle2, BoundingBox2, Point2, Polygon2, Quaternion, Vector2 } from '/js/linalg.mjs';
+import { Angle2, BoundingBox2, Matrix2, Point2, Polygon2, Quaternion, Vector2 } from '/js/linalg.mjs';
 import { Stylable } from '/js/mixins.mjs';
 import { createElement, jfetch } from '/js/util.mjs';
 
@@ -37,12 +37,11 @@ class MiniMap extends Stylable(HTMLElement) {
     #additionalTouches;
     //-- Technical variables
     #mapImage;
+    #mapTransform;
     #mapOrigin;
     #savedMapOrigin;
     #mapAngle;
     #savedMapAngle;
-    #mapFactor;
-    #savedMapFactor;
     #heatmap;
     #heatmapBB;
 
@@ -60,14 +59,6 @@ class MiniMap extends Stylable(HTMLElement) {
         this.#savedOrientation = null;
         this.#savedPath = [new Point2(0, 0)];
         this.#savedWalls = [];
-
-        // Browsers behave differently if the floor plan is not explicitely in the DOM. Let’s put it
-        // in the body, with a hidden visibility to force loading and proper sizing (which we will
-        // correct later).
-        // TODO: custom loading
-        this.#mapImage = createElement('img', null, { src: '/placeholder.svg' });
-        this.#mapImage.style.visibility = 'hidden';
-        document.body.appendChild(this.#mapImage);
 
         const topBar = createElement('div', 'top-bar');
         this.appendToShadow(topBar);
@@ -96,12 +87,6 @@ class MiniMap extends Stylable(HTMLElement) {
 
         this.#trackedTouches = new Map();
         this.#additionalTouches = new Map();
-        this.#mapOrigin = new Point2(0, 0);
-        this.#savedMapOrigin = this.#mapOrigin;
-        this.#mapAngle = 0;
-        this.#savedMapAngle = this.#mapAngle;
-        this.#mapFactor = 10;
-        this.#savedMapFactor = 10;
 
         this.#heatmap = null;
 
@@ -116,14 +101,22 @@ class MiniMap extends Stylable(HTMLElement) {
         this.addEventListener('transitionend', this.#resize);
         closeBtn.addEventListener('click', this.#unzoom.bind(this));
 
-        this.#redraw();
+        this.#updateViewport();
+        // Browsers behave differently if the floor plan is not explicitely in the DOM. Let’s put it
+        // in the body, with a hidden visibility to force loading and proper sizing (which we will
+        // correct later).
+        // TODO: custom loading
+        this.#mapImage = createElement('img', null, { src: '/placeholder.svg' });
+        this.#mapImage.addEventListener('load', this.#resetMapTransform.bind(this));
+        this.#mapImage.style.visibility = 'hidden';
+        this.#mapTransform = new Matrix2(.05);
+        document.body.appendChild(this.#mapImage);
     }
 
     // Save the floor plan state before touch transformations are applied
     #saveMapData() {
         this.#savedMapOrigin = this.#mapOrigin;
         this.#savedMapAngle = this.#mapAngle;
-        this.#savedMapFactor = this.#mapFactor;
     }
 
     // Convert a TouchList into an (identifier => { x, y }) map, with global coordinates
@@ -200,23 +193,29 @@ class MiniMap extends Stylable(HTMLElement) {
             default:
                 const fromV = anchors[0].from.to(anchors[1].from);
                 const toV = anchors[0].to.to(anchors[1].to);
-                // Compute the homothety
-                const scale = toV.norm() / fromV.norm();
-                this.#mapFactor = this.#savedMapFactor * scale;
                 // Compute the rigid transformation
                 const delta = Math.atan2(toV.y, toV.x) - Math.atan2(fromV.y, fromV.x);
                 this.#mapAngle = this.#savedMapAngle + delta;
-                this.#mapOrigin = anchors[0].to.minus(this.#savedMapOrigin.to(anchors[0].from).rotated(new Angle2(delta)).scaled(scale));
+                const fromHalf = anchors[0].from.plus(fromV.scaled(.5));
+                const toHalf = anchors[0].to.plus(toV.scaled(.5));
+                this.#mapOrigin = toHalf.plus(fromHalf.to(this.#savedMapOrigin)
+                                        .rotated(new Angle2(delta)));
                 break;
         }
         this.#redraw();
     }
 
     // Resize the viewport depending on the displayed elements
-    #updateViewport(viewport, ratio) {
-        this.#center = viewport.center();
-        const scale = Math.min(20, .8 * this.#canvas.width / (ratio * viewport.width()),
-                                   .8 * this.#canvas.height / (ratio * viewport.height()));
+    #updateViewport(viewport = null, ratio = 1) {
+        let scale;
+        if (viewport === null) {
+            scale = 20;
+        }
+        else {
+            this.#center = viewport.center();
+            scale = Math.min(20, .8 * this.#canvas.width / (ratio * viewport.width()),
+                                 .8 * this.#canvas.height / (ratio * viewport.height()));
+        }
         if (this.#scale !== scale) {
             this.#scale = scale;
             this.#mapScale.setAttribute('scale', scale);
@@ -298,12 +297,13 @@ class MiniMap extends Stylable(HTMLElement) {
         modal.appendChild(items);
         const api = window.app.api();
         jfetch(`${api}/maps?recurse`, data => {
-            for (const { name, path } of Object.values(data)) {
+            for (const { name, path, anchors } of Object.values(data)) {
                 const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
                 const item = createElement('div', 'map-item');
                 item.appendChild(createElement('img', null, { src, alt: name }));
                 item.appendChild(createElement('div', null, null, name));
                 item.addEventListener('click', () => {
+                    this.#projectMap(anchors);
                     this.#mapImage.src = `${api}/${path}`;
                     this.#mapSelector.textContent = name;
                     this.#mapSelector.classList.remove('incomplete');
@@ -332,19 +332,16 @@ class MiniMap extends Stylable(HTMLElement) {
         this.#ctx.lineCap = 'round';
         this.#ctx.lineJoin = 'round';
 
+        const center = new Point2(this.#canvas.width, this.#canvas.height)
+                           .scaled(.5).minus(this.#center.scaled(scale));
+
         // Compute the transformation matrix for the floor plan
-        const angle = new Angle2(this.#mapAngle);
-        const factor = this.#mapFactor * scale / this.#mapImage.width;
-        this.#ctx.setTransform(factor * angle.cos, factor * angle.sin, -factor * angle.sin,
-                               factor * angle.cos,
-                               this.#canvas.width / 2 + (this.#mapOrigin.x - this.#center.x) * scale,
-                               this.#canvas.height / 2 + (this.#mapOrigin.y - this.#center.y) * scale);
-        this.#ctx.drawImage(this.#mapImage, new Point2(0, 0), new Vector2(this.#mapImage.width, this.#mapImage.height));
+        this.#ctx.setTransform(new Matrix2(scale, new Angle2(this.#mapAngle)).mul(this.#mapTransform),
+                               center.plus(this.#mapOrigin.scaled(scale)));
+        this.#ctx.drawImage(this.#mapImage, Point2.origin);
 
         // Switch to a simple viewport homothety
-        this.#ctx.setTransform(scale, 0, 0, scale,
-                               this.#canvas.width / 2 - this.#center.x * scale,
-                               this.#canvas.height / 2 - this.#center.y * scale);
+        this.#ctx.setTransform(new Matrix2(scale), center);
 
         if (this.#heatmap !== null) {
             this.#ctx.globalCompositeOperation = 'darken';
@@ -416,6 +413,40 @@ class MiniMap extends Stylable(HTMLElement) {
             this.#redraw();
         });
         img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    }
+
+    // Reset the map rigid transformation
+    #resetMapTransform() {
+        this.#mapOrigin = this.#mapTransform.appliedTo(new Point2(this.#mapImage.width, this.#mapImage.height).scaled(-.5));
+        this.#savedMapOrigin = this.#mapOrigin;
+        this.#mapAngle = 0;
+        this.#savedMapAngle = this.#mapAngle;
+        this.#redraw();
+    }
+
+    // Project the map onto the local viewport
+    #projectMap(anchors) {
+        const phi = Angle2.deg2rad(anchors[0].lat);
+
+        // https://gis.stackexchange.com/a/75535
+        const dLng = 111412.877331 * Math.cos(phi) - 93.504117 * Math.cos(3 * phi)
+                   + 0.117744 * Math.cos(5 * phi) - .000165 * Math.cos(7 * phi);
+        const dLat = 111132.95255 - 559.84957 * Math.cos(2 * phi) + 1.17514 * Math.cos(4 * phi)
+                   - .00230 * Math.cos(6 * phi);
+
+        const p = new Point2(anchors[0]);
+        const srcV = p.to(anchors[1]);
+        const srcV2 = p.to(anchors[2]);
+        const dstV = new Vector2((anchors[1].lng - anchors[0].lng) * dLng,
+                                 (anchors[1].lat - anchors[0].lat) * dLat);
+        const dstV2 = new Vector2((anchors[2].lng - anchors[0].lng) * dLng,
+                                  (anchors[2].lat - anchors[0].lat) * dLat);
+        const det = srcV.cross(srcV2);
+
+        this.#mapTransform = new Matrix2((dstV.x * srcV2.y - dstV2.x * srcV.y) / det,
+                                         (dstV2.x * srcV.x - dstV.x * srcV2.x) / det,
+                                         (dstV2.y * srcV.y - dstV.y * srcV2.y) / det,
+                                         (dstV.y * srcV2.x - dstV2.y * srcV.x) / det);
     }
 }
 
