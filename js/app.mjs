@@ -8,6 +8,9 @@ import { M } from '/js/meshes.mjs';
 import { createElement, jfetch } from '/js/util.mjs';
 import { WS } from '/js/ws.mjs';
 
+const DEFAULT_AP = 'http://ap.local';
+const NO_REACHABLE_AP = '<No reachable AP>';
+
 export class App {
     #ap;
     #api;
@@ -21,6 +24,7 @@ export class App {
     #orientation;
     #path;
     #pose;
+    #progressModal;
     #refSpace;
     #session;
     #uuid;
@@ -35,10 +39,12 @@ export class App {
         this.#magicWheel = createElement('magic-wheel');
         document.body.appendChild(this.#magicWheel);
         const startModal = createElement('modal-box', null, {closable: 'no'});
+        this.#progressModal = createElement('modal-box', null, {closable: 'no', progress: 'yes'});
         const start = createElement('div', 'button', null, 'Click here to start');
         startModal.appendChild(start);
         document.body.appendChild(startModal);
-        document.body.appendChild(createElement('span', null, {id: 'ap'}, '<No reachable AP>'));
+        document.body.appendChild(this.#progressModal);
+        document.body.appendChild(createElement('span', null, {id: 'ap'}, NO_REACHABLE_AP));
         document.scene = this;
         this.#measurements = [];
         this.#uuid = null;
@@ -65,14 +71,6 @@ export class App {
         this.#session.requestAnimationFrame(this.#processFrame.bind(this));
     }
 
-    #spawnMessage(id, message) {
-        const modal = createElement('modal-box', null, {closable: 'no', id});
-        const msg = createElement('span', null, null, message);
-        modal.appendChild(msg);
-        document.body.appendChild(modal);
-        return [modal, msg];
-    }
-
     init() {
         this.#init().then(() => this.#featureIndicators.update('xr', 'granted')).catch(e => {
             console.error(e);
@@ -82,7 +80,7 @@ export class App {
 
         navigator.geolocation.watchPosition(this.#processGPS.bind(this), null, { enableHighAccuracy: true, timeout: 5000 });
 
-        this.#spawnMessage('connect-ws', 'Connecting to the server…');
+        this.#progressModal.addProgress('connect-ws', 'Connecting to the server');
         this.#initWS();
         this.#initAP();
     }
@@ -102,34 +100,42 @@ export class App {
         });
         this.#ws.addEventListener('open', async () => {
             this.#sendWS('INIT', this.#uuid);
-            document.getElementById('connect-ws')?.remove();
+            this.#progressModal.completeProgress('connect-ws');
         });
         this.#ws.addEventListener('close', () => {
-            if (document.getElementById('connect-ws') === null)
-                this.#spawnMessage('connect-ws', 'Connection lost. Reconnecting to the server…');
+            this.#progressModal.addProgress('connect-ws', 'Connection lost, reconnecting to the server');
         });
     }
 
     #pingAP(host) {
-        document.getElementById('connect-ap')?.remove();
-        const [modal, msg] = this.#spawnMessage('connect-ap', `Contacting the AP (${host})…`);
+        const idx = host.indexOf("://");
+        let displayHost;
+        if (idx === -1)
+            displayHost = host;
+        else
+            displayHost = host.slice(idx + 3);
+        const connectAP = this.#progressModal.addProgress(`connect-ap-${host}`, 'Contacting ');
+        connectAP.appendChild(createElement('code', null, null, displayHost));
         return jfetch(`${host}/cgi-bin/info`, data => {
             const model = data.model;
-            msg.textContent = `Listing radios (${host})…`;
+            this.#progressModal.addProgress('list-radios', 'Listing radios');
+            this.#progressModal.completeProgress(`connect-ap-${host}`);
             return jfetch(`${host}/cgi-bin/list`, data => {
                 document.getElementById('ap').textContent = model;
                 const names = Object.keys(data);
                 this.#ap = { host, model, radios: Object.fromEntries(names.map(e => [e, []])) };
-                msg.textContent = `Calibrating radios (${host}, [${names.join(', ')}])…`;
-                // TODO: show more context, i.e. when a single radio has finished.
+                this.#progressModal.completeProgress('list-radios');
                 const start = performance.now();
                 return Promise.all(names.map(name => {
-                    return fetch(`${host}/cgi-bin/scan/${name}`)
-                           .then(r => r.arrayBuffer().then (() => {
+                    const calibrateRadio = this.#progressModal.addProgress(`calibrate-radio-${name}`, 'Calibrating ');
+                    calibrateRadio.appendChild(createElement('code', null, null, name));
+                    return fetch(`${host}/cgi-bin/scan/${name}`).then(r => r.arrayBuffer().then(() => {
                         this.#ap.radios[name].push(performance.now() - start);
-                    }));
+                        this.#progressModal.completeProgress(`calibrate-radio-${name}`);
+                    })).catch(() => {
+                        this.#progressModal.errProgress(`calibrate-radio-${name}`);
+                    })
                 })).then(() => {
-                    modal.remove();
                     this.#apRounds = 0;
                 });
             });
@@ -139,7 +145,10 @@ export class App {
     #initAP() {
         this.#ap = null;
         this.#apRounds = 0;
-        this.#pingAP('http://ap.local').catch(this.#sendWS('NOAP'));
+        this.#pingAP(DEFAULT_AP).catch(() => {
+            this.#progressModal.errProgress(`connect-ap-${DEFAULT_AP}`);
+            this.#sendWS('NOAP');
+        });
     }
 
     // Add a point to the path
@@ -305,7 +314,11 @@ export class App {
                       await this.#pingAP(host).catch();
                       return;
                   }
-                  catch {}
+                  catch {
+                      document.getElementById('ap').textContent = NO_REACHABLE_AP;
+                      this.#progressModal.errProgress(`connect-ap-${host}`);
+                      this.#progressModal.errProgress('list-radios');
+                  }
               }
               if (++this.#apRounds >= 3) {
                   const modal = createElement('modal-box', null, {closable: 'no'});
@@ -313,7 +326,6 @@ export class App {
                                               'Failed to join the AP. Click here to retry.');
                   modal.appendChild(retry);
                   document.body.appendChild(modal);
-                  document.getElementById('connect-ap')?.remove();
                   retry.addEventListener('click', () => {
                       modal.remove();
                       this.#initAP();

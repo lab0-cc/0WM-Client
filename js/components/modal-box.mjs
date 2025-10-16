@@ -7,6 +7,8 @@ class ModalBox extends Stylable(HTMLElement) {
     #childrenObserver;
     #closable;
     #inner;
+    #progress;
+    #progressOnly;
 
     constructor() {
         super();
@@ -22,6 +24,8 @@ class ModalBox extends Stylable(HTMLElement) {
 
         outer.addEventListener('click', this.#close.bind(this));
         this.#childrenObserver = new MutationObserver(() => this.#childrenReady());
+
+        this.#progress = new Map();
     }
 
     connectedCallback() {
@@ -39,8 +43,67 @@ class ModalBox extends Stylable(HTMLElement) {
             this.remove();
     }
 
+    addProgress(key, text) {
+        const oldProgress = this.#progress.get(key);
+        if (oldProgress !== undefined)
+            oldProgress.remove();
+        const progressIndicator = createElement('span', 'progress-indicator');
+        const progress = createElement('span', 'progress', null, text);
+        progress.appendChild(progressIndicator);
+        this.#progress.set(key, progress);
+        this.#inner.appendChild(progress);
+        this.#updateProgress();
+        return progress;
+    }
+
+    removeProgress(key) {
+        const progress = this.#progress.get(key);
+        if (progress === undefined)
+            return
+        progress.remove();
+        this.#progress.delete(key);
+        this.#updateProgress();
+    }
+
+    clearProgress() {
+        for (const [key, progress] of this.#progress) {
+            progress.remove();
+            this.#progress.delete(key);
+        }
+    }
+
+    completeProgress(key, collect=true) {
+        const progress = this.#progress.get(key);
+        if (progress === undefined)
+            return
+        progress.classList.add('ok');
+        if (collect)
+            progress.classList.add('collect');
+        this.#updateProgress();
+    }
+
+    errProgress(key, collect=true) {
+        const progress = this.#progress.get(key);
+        if (progress === undefined)
+            return
+        progress.classList.add('error');
+        if (collect)
+            progress.classList.add('collect');
+        this.#updateProgress();
+    }
+
+    #updateProgress() {
+        if (this.#progressOnly && this.#progress.values().every(e => e.classList.contains('collect'))) {
+            this.style.display = 'none';
+            this.clearProgress();
+        }
+        else {
+            this.style.removeProperty('display');
+        }
+    }
+
     static get observedAttributes() {
-        return ['closable', 'height', 'width'];
+        return ['closable', 'height', 'progress', 'width'];
     }
 
     attributeChangedCallback(name, old, current) {
@@ -50,6 +113,10 @@ class ModalBox extends Stylable(HTMLElement) {
                 break;
             case 'height':
                 this.#inner.style.height = `${current}px`;
+                break;
+            case 'progress':
+                this.#progressOnly = current != 'no';
+                this.#updateProgress();
                 break;
             case 'width':
                 this.#inner.style.width = `${current}px`;
