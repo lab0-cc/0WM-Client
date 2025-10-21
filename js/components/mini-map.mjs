@@ -44,6 +44,8 @@ class MiniMap extends Stylable(HTMLElement) {
     #savedMapAngle;
     #heatmap;
     #heatmapBB;
+    #editing;
+    #editBtn;
 
     constructor() {
         super();
@@ -65,9 +67,11 @@ class MiniMap extends Stylable(HTMLElement) {
 
         const editor = createElement('div', 'map-editor');
         const container = createElement('div', 'container');
-        const editBtn = createElement('div', 'button right');
-        editBtn.textContent = "Edit";
-        container.appendChild(editBtn);
+        this.#editing = false;
+        this.#editBtn = createElement('div', 'button right');
+        this.#editBtn.textContent = "Edit";
+        container.appendChild(this.#editBtn);
+        this.#editBtn.addEventListener('click', this.#toggleEdit.bind(this));
         this.#modeSelector = createElement('div', 'select');
         container.appendChild(this.#modeSelector);
         this.#mapSelector = createElement('div', 'select incomplete');
@@ -131,6 +135,7 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Handle the touchstart event for the floor plan
     #touchStart(e) {
+        if (!this.#editing) return;
         const touches = this.#buildTouchMap(e.touches);
         const { x, y } = this.#canvas.getBoundingClientRect();
         for (const { identifier, clientX, clientY } of e.changedTouches) {
@@ -157,6 +162,7 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Handle the touchend and touchcancel events for the floor plan
     #touchEnd(e) {
+        if (!this.#editing) return;
         const touches = this.#buildTouchMap(e.touches);
         for (const { identifier } of e.changedTouches) {
             // Remove untracked points when they disappear
@@ -180,6 +186,7 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Handle the touchmove event for the floor plan
     #touchMove(e) {
+        if (!this.#editing) return;
         const touches = this.#buildTouchMap(e.touches);
         const anchors = [];
         this.#trackedTouches.forEach((touch, id, _) => anchors.push({ from: touch, to: touches.get(id) }));
@@ -240,6 +247,8 @@ class MiniMap extends Stylable(HTMLElement) {
     #unzoom(e) {
         this.classList.add('zooming');
         this.classList.remove('zoomed');
+        if (this.#editing)
+            this.#toggleEdit();
         e.stopPropagation();
     }
 
@@ -256,6 +265,20 @@ class MiniMap extends Stylable(HTMLElement) {
     #setMode(mode) {
         this.#currentMode = mode.id;
         this.#modeSelector.textContent = mode.title;
+    }
+
+    // Switch to edit mode
+    #toggleEdit() {
+        if (this.#editing) {
+            this.#editing = false;
+            this.#editBtn.classList.remove('selected');
+            this.#editBtn.textContent = "Edit";
+        }
+        else {
+            this.#editing = true;
+            this.#editBtn.classList.add('selected');
+            this.#editBtn.textContent = "Ok";
+        }
     }
 
     // Edit the floor plan placement mode

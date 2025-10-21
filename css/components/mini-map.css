@@ -60,10 +60,10 @@
 
 :host > .top-bar > * {
     position: absolute;
-    background: #fff8;
+    background: #fffe;
     height: 36px;
     border-radius: 18px;
-    box-shadow: 0 1px 3px -1px #000;
+    box-shadow: 0 1px 4px -2px #000;
     top: 10px;
     font-size: 14px;
 }
@@ -160,4 +160,8 @@
 
 :host > .top-bar > .map-editor > .container > .right ~ :last-child {
     margin-right: 80px;
+}
+
+:host > .top-bar > .map-editor > .container > .selected {
+    background: #f4f4f4;
 }
