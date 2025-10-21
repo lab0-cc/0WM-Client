@@ -1,7 +1,7 @@
 // This module implements the UI indicating that a scan is running
 
 import { Stylable } from '/js/mixins.mjs';
-import { createElement } from '/js/util.mjs';
+import { createElement as E } from '/js/util.mjs';
 
 class ScanProgress extends Stylable(HTMLElement) {
     #progresses;
@@ -16,10 +16,9 @@ class ScanProgress extends Stylable(HTMLElement) {
 
     // Add a progress frame
     add(name) {
-        const progress = createElement('div', 'progress', {dataRadio: name});
-        this.#progresses[name] = progress;
+        this.#child = this.#child.appendElement({ tag: 'div', className: 'progress', attributes: { dataRadio: name } });
+        this.#progresses[name] = this.#child;
         this.set(name, 0);
-        this.#child = this.#child.appendChild(progress);
     }
 
     // Set the value of a progress frame ([0..1] range)

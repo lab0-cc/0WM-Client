@@ -3,7 +3,7 @@
 import { Context2D } from '/js/context2d.mjs';
 import { Angle2, BoundingBox2, Matrix2, Point2, Polygon2, Quaternion, Vector2 } from '/js/linalg.mjs';
 import { Stylable } from '/js/mixins.mjs';
-import { createElement, jfetch } from '/js/util.mjs';
+import { createElement as E, jfetch } from '/js/util.mjs';
 
 const MODES = [{ id: 'manual', title: 'Manual mode', description: 'Fully manual map positioning' },
                { id: 'assisted', title: 'Assisted mode', description: 'The server helps you select a floor plan (requires GPS)' },
@@ -51,8 +51,7 @@ class MiniMap extends Stylable(HTMLElement) {
         super();
 
         const width = 150 * (window.devicePixelRatio || 1);
-        this.#canvas = createElement('canvas', null, { height: width, width });
-        this.appendToShadow(this.#canvas);
+        this.#canvas = this.appendToShadow(E('canvas', null, { height: width, width }));
         this.#ctx = this.#canvas.getContext('2d');
         Object.setPrototypeOf(this.#ctx, Context2D.prototype);
         this.#pathWidth = .5;
@@ -62,32 +61,26 @@ class MiniMap extends Stylable(HTMLElement) {
         this.#savedPath = [new Point2(0, 0)];
         this.#savedWalls = [];
 
-        const topBar = createElement('div', 'top-bar');
-        this.appendToShadow(topBar);
+        const topBar = this.appendToShadow(E('div', 'top-bar'));
 
-        const editor = createElement('div', 'map-editor');
-        const container = createElement('div', 'container');
+        const [editor, closeBtn] = topBar.appendElements(
+            { tag: 'div', className: 'map-editor' },
+            { tag: 'div', className: 'close' }
+        );
+
+        const container = editor.appendElement({ tag: 'div', className: 'container' });
         this.#editing = false;
-        this.#editBtn = createElement('div', 'button right');
-        this.#editBtn.textContent = "Edit";
-        container.appendChild(this.#editBtn);
+        [this.#editBtn, this.#modeSelector, this.#mapSelector] = container.appendElements(
+            { tag: 'div', className: 'button right', content: 'Edit' },
+            { tag: 'div', className: 'select' },
+            { tag: 'div', className: 'select incomplete', content: 'No map selected' }
+        );
         this.#editBtn.addEventListener('click', this.#toggleEdit.bind(this));
-        this.#modeSelector = createElement('div', 'select');
-        container.appendChild(this.#modeSelector);
-        this.#mapSelector = createElement('div', 'select incomplete');
-        this.#mapSelector.textContent = 'No map selected';
-        container.appendChild(this.#mapSelector);
-        editor.appendChild(container);
-        topBar.appendChild(editor);
         this.#modeSelector.addEventListener('click', this.#editMode.bind(this));
         this.#setMode(MODES[0]);
         this.#mapSelector.addEventListener('click', this.#browseFloorplans.bind(this));
 
-        const closeBtn = createElement('div', 'close');
-        topBar.appendChild(closeBtn);
-
-        this.#mapScale = createElement('map-scale');
-        this.appendToShadow(this.#mapScale);
+        this.#mapScale = this.appendToShadow(E('map-scale'));
 
         this.#trackedTouches = new Map();
         this.#additionalTouches = new Map();
@@ -110,8 +103,10 @@ class MiniMap extends Stylable(HTMLElement) {
         // in the body, with a hidden visibility to force loading and proper sizing (which we will
         // correct later).
         // TODO: custom loading
-        this.#mapImage = createElement('img', null, { src: '/placeholder.svg' });
+        this.#mapImage = E('img');
+        // Let’s play safe here and load the placeholder after attaching the event listener
         this.#mapImage.addEventListener('load', this.#resetMapTransform.bind(this));
+        this.#mapImage.src = '/placeholder.svg';
         this.#mapImage.style.visibility = 'hidden';
         this.#mapTransform = new Matrix2(.05);
         document.body.appendChild(this.#mapImage);
@@ -283,22 +278,20 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Edit the floor plan placement mode
     #editMode() {
-        const modal = createElement('modal-box', null, { width: 260 });
+        const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 260 } });
         for (const mode of MODES) {
-            const choice = createElement('div', 'choice');
-            const radio = createElement('input', null, { type: 'radio', name: 'mode', id: `mode-${mode.id}` });
+            const choice = modal.appendElement({ tag: 'div', className: 'choice' });
+            const id = `mode-${mode.id}`;
+            const [radio, label] = choice.appendElements(
+                { tag: 'input', attributes: { type: 'radio', name: 'mode', id } },
+                { tag: 'label', attributes: { for: id } }
+            );
             if (this.#currentMode === mode.id)
                 radio.checked = true;
-            choice.appendChild(radio);
-            const label = createElement('label', null, { for: radio.id });
-            const title = createElement('span', 'title');
-            title.textContent = mode.title;
-            label.appendChild(title);
-            const description = createElement('span', 'description');
-            description.textContent = mode.description;
-            label.appendChild(description);
-            choice.appendChild(label);
-            modal.appendChild(choice);
+            const [title, description] = label.appendElements(
+                { tag: 'span', className: 'title', content: mode.title },
+                { tag: 'span', className: 'description', content: mode.description },
+            );
             radio.addEventListener('click', e => {
                 this.#setMode(mode);
                 modal.remove();
@@ -310,21 +303,21 @@ class MiniMap extends Stylable(HTMLElement) {
                 choice.classList.add('disabled');
             }
         }
-        document.body.appendChild(modal);
     }
 
     // Browse the available floorplans
     #browseFloorplans() {
-        const modal = createElement('modal-box', null, { width: 300 });
-        const items = createElement('div', 'map-items');
-        modal.appendChild(items);
+        const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 300 } });
+        const items = modal.appendElement({ tag: 'div', className: 'map-items' });
         const api = window.app.api();
         jfetch(`${api}/maps?recurse`, data => {
             for (const { name, path, anchors } of Object.values(data)) {
                 const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
-                const item = createElement('div', 'map-item');
-                item.appendChild(createElement('img', null, { src, alt: name }));
-                item.appendChild(createElement('div', null, null, name));
+                const item = items.appendElement({ tag: 'div', className: 'map-item' });
+                item.appendElements(
+                    { tag: 'img', attributes: { src, alt: name } },
+                    { tag: 'div', content: name }
+                );
                 item.addEventListener('click', () => {
                     this.#projectMap(anchors);
                     this.#mapImage.src = `${api}/${path}`;
@@ -332,10 +325,8 @@ class MiniMap extends Stylable(HTMLElement) {
                     this.#mapSelector.classList.remove('incomplete');
                     modal.remove();
                 })
-                items.appendChild(item);
             }
         });
-        document.body.appendChild(modal);
     }
 
     // Draw the scene on the minimap
@@ -368,7 +359,7 @@ class MiniMap extends Stylable(HTMLElement) {
 
         if (this.#heatmap !== null) {
             this.#ctx.globalCompositeOperation = 'darken';
-		    this.#ctx.drawImage(this.#heatmap, this.#heatmapBB.min,
+            this.#ctx.drawImage(this.#heatmap, this.#heatmapBB.min,
                                 new Vector2(this.#heatmapBB.width(), this.#heatmapBB.height()));
             this.#ctx.globalCompositeOperation = 'source-over';
         }

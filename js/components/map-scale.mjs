@@ -1,7 +1,7 @@
 // This module implements a metric and imperial scale for the minimap
 
 import { Stylable } from '/js/mixins.mjs';
-import { createElement } from '/js/util.mjs';
+import { createElement as E } from '/js/util.mjs';
 
 class MapScale extends Stylable(HTMLElement) {
     #metric;
@@ -12,20 +12,14 @@ class MapScale extends Stylable(HTMLElement) {
     constructor() {
         super();
 
-        this.#metricDiv = createElement('div', 'metric');
-        this.appendToShadow(this.#metricDiv);
-        this.#imperialDiv = createElement('div', 'imperial');
-        this.appendToShadow(this.#imperialDiv);
+        this.#metricDiv = this.appendToShadow(E('div', 'metric'));
+        this.#imperialDiv = this.appendToShadow(E('div', 'imperial'));
 
         this.#metric = [];
         this.#imperial = [];
         for (let i = 0; i < 5; i++) {
-            const mDiv = createElement('div')
-            const iDiv = createElement('div')
-            this.#metric.push(mDiv);
-            this.#imperial.push(iDiv);
-            this.#metricDiv.appendChild(mDiv);
-            this.#imperialDiv.appendChild(iDiv);
+            this.#metric.push(this.#metricDiv.appendElement('div'));
+            this.#imperial.push(this.#imperialDiv.appendElement('div'));
         }
 
         this.addStylesheet('components/map-scale.css');

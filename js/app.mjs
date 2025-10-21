@@ -5,7 +5,7 @@ import { createHUD } from '/js/hud.mjs';
 import { BoundedSurface3, Matrix4, Point2, Point3, Polygon2, Vector2 } from '/js/linalg.mjs';
 import { mad, med } from '/js/math.mjs';
 import { M } from '/js/meshes.mjs';
-import { createElement, jfetch } from '/js/util.mjs';
+import { createElement as E, jfetch } from '/js/util.mjs';
 import { WS } from '/js/ws.mjs';
 
 const DEFAULT_AP = 'http://ap.local';
@@ -32,19 +32,17 @@ export class App {
 
     constructor() {
         this.#path = [];
-        this.#miniMap = createElement('mini-map');
-        document.body.appendChild(this.#miniMap);
-        this.#featureIndicators = createElement('feature-indicators');
-        document.body.appendChild(this.#featureIndicators);
-        this.#magicWheel = createElement('magic-wheel');
-        document.body.appendChild(this.#magicWheel);
-        const startModal = createElement('modal-box', null, {closable: 'no'});
-        this.#progressModal = createElement('modal-box', null, {closable: 'no', progress: 'yes'});
-        const start = createElement('div', 'button', null, 'Click here to start');
-        startModal.appendChild(start);
-        document.body.appendChild(startModal);
-        document.body.appendChild(this.#progressModal);
-        document.body.appendChild(createElement('span', null, {id: 'ap'}, NO_REACHABLE_AP));
+        let startModal;
+        [this.#miniMap, this.#featureIndicators, this.#magicWheel, startModal, this.#progressModal,] =
+            document.body.appendElements(
+                'mini-map',
+                'feature-indicators',
+                'magic-wheel',
+                { tag: 'modal-box', attributes: { closable: 'no' } },
+                { tag: 'modal-box', attributes: { closable: 'no', progress: 'yes' } },
+                { tag: 'span', attributes: { id: 'ap' }, content: NO_REACHABLE_AP }
+            );
+        const start = startModal.appendElement({ tag: 'div', className: 'button', content: 'Click here to start' });
         document.scene = this;
         this.#measurements = [];
         this.#uuid = null;
@@ -64,7 +62,7 @@ export class App {
             optionalFeatures: ['plane-detection'],
             domOverlay: { root: document.body }
         });
-        this.#ctx = new Context(createElement('canvas'));
+        this.#ctx = new Context(E('canvas'));
         this.#m = new M(this.#ctx);
         this.#ctx.attachTo(this.#session);
         this.#refSpace = await this.#session.requestReferenceSpace('local-floor');
@@ -115,7 +113,7 @@ export class App {
         else
             displayHost = host.slice(idx + 3);
         const connectAP = this.#progressModal.addProgress(`connect-ap-${host}`, 'Contacting ');
-        connectAP.appendChild(createElement('code', null, null, displayHost));
+        connectAP.appendElement({ tag: 'code', content: displayHost });
         return jfetch(`${host}/cgi-bin/info`, data => {
             const model = data.model;
             this.#progressModal.addProgress('list-radios', 'Listing radios');
@@ -124,11 +122,10 @@ export class App {
                 document.getElementById('ap').textContent = model;
                 const names = Object.keys(data);
                 this.#ap = { host, model, radios: Object.fromEntries(names.map(e => [e, []])) };
-                this.#progressModal.completeProgress('list-radios');
                 const start = performance.now();
-                return Promise.all(names.map(name => {
+                const res = Promise.all(names.map(name => {
                     const calibrateRadio = this.#progressModal.addProgress(`calibrate-radio-${name}`, 'Calibrating ');
-                    calibrateRadio.appendChild(createElement('code', null, null, name));
+                    calibrateRadio.appendElement({ tag: 'code', content: name });
                     return fetch(`${host}/cgi-bin/scan/${name}`).then(r => r.arrayBuffer().then(() => {
                         this.#ap.radios[name].push(performance.now() - start);
                         this.#progressModal.completeProgress(`calibrate-radio-${name}`);
@@ -138,6 +135,8 @@ export class App {
                 })).then(() => {
                     this.#apRounds = 0;
                 });
+                this.#progressModal.completeProgress('list-radios');
+                return res;
             });
         });
     }
@@ -261,8 +260,7 @@ export class App {
     // Request a Wi-Fi scan
     requestMeasurement() {
         if(!this.#pose) return;
-        const progress = createElement('scan-progress');
-        document.body.appendChild(progress);
+        const progress = document.body.appendElement('scan-progress');
         const start = performance.now();
         // TODO: handle disconnection
         // TODO: fail if the user moves too much
@@ -321,11 +319,8 @@ export class App {
                   }
               }
               if (++this.#apRounds >= 3) {
-                  const modal = createElement('modal-box', null, {closable: 'no'});
-                  const retry = createElement('div', 'button', null,
-                                              'Failed to join the AP. Click here to retry.');
-                  modal.appendChild(retry);
-                  document.body.appendChild(modal);
+                  const modal = document.body.appendElement({ tag: 'modal-box', attributes: { closable: 'no' } });
+                  const retry = modal.appendElement({ tag: 'div', className: 'button', content: 'Failed to join the AP. Click here to retry.' });
                   retry.addEventListener('click', () => {
                       modal.remove();
                       this.#initAP();

@@ -1,7 +1,7 @@
 // This module implements modal boxes
 
 import { Stylable } from '/js/mixins.mjs';
-import { createElement } from '/js/util.mjs';
+import { createElement as E } from '/js/util.mjs';
 
 class ModalBox extends Stylable(HTMLElement) {
     #childrenObserver;
@@ -13,11 +13,8 @@ class ModalBox extends Stylable(HTMLElement) {
     constructor() {
         super();
 
-        const outer = createElement('div', 'outer');
-        this.appendToShadow(outer);
-
-        this.#inner = createElement('div', 'inner');
-        this.appendToShadow(this.#inner);
+        const outer = this.appendToShadow(E('div', 'outer'));
+        this.#inner = this.appendToShadow(E('div', 'inner'));
 
         this.addStylesheet('components/modal-box.css');
         this.#closable = true;
@@ -35,7 +32,7 @@ class ModalBox extends Stylable(HTMLElement) {
     }
 
     #childrenReady() {
-      [...this.children].forEach(e => this.#inner.appendChild(e));
+        [...this.children].forEach(e => this.#inner.appendChild(e));
     }
 
     #close() {
@@ -47,11 +44,9 @@ class ModalBox extends Stylable(HTMLElement) {
         const oldProgress = this.#progress.get(key);
         if (oldProgress !== undefined)
             oldProgress.remove();
-        const progressIndicator = createElement('span', 'progress-indicator');
-        const progress = createElement('span', 'progress', null, text);
-        progress.appendChild(progressIndicator);
+        const progress = this.#inner.appendElement({ tag: 'span', className: 'progress', content: text });
+        progress.appendElement({ tag: 'span', className: 'progress-indicator' });
         this.#progress.set(key, progress);
-        this.#inner.appendChild(progress);
         this.#updateProgress();
         return progress;
     }

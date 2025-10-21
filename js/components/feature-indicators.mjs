@@ -1,7 +1,7 @@
 // This module implements indicators for Web API features
 
 import { Stylable } from '/js/mixins.mjs';
-import { createElement } from '/js/util.mjs';
+import { createElement as E } from '/js/util.mjs';
 
 const STATES = { prompt: "pending", granted: "enabled", denied: "disabled", unsupported: "not supported" }
 
@@ -15,9 +15,8 @@ class FeatureIndicators extends Stylable(HTMLElement) {
                            planes: { description: "Plane detection", div: null },
                            gps: { description: "GPS", div: null } };
         for (const feature in this.#features) {
-            const featureDiv = createElement('div', feature);
+            const featureDiv = this.appendToShadow(E('div', feature));
             this.#features[feature].div = featureDiv;
-            this.appendToShadow(featureDiv);
         }
 
         // TODO: die
