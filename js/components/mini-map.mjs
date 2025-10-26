@@ -5,9 +5,9 @@ import { Angle2, BoundingBox2, Matrix2, Point2, Polygon2, Quaternion, Vector2 } 
 import { Stylable } from '/js/mixins.mjs';
 import { createElement as E, jfetch } from '/js/util.mjs';
 
-const MODES = [{ id: 'manual', title: 'Manual mode', description: 'Fully manual map positioning' },
-               { id: 'assisted', title: 'Assisted mode', description: 'The server helps you select a floor plan (requires GPS)' },
-               { id: 'automatic', title: 'Automatic mode', description: 'The server helps you select and position a floor plan (requires GPS and wall detection)' }];
+const MODES = [{ id: 1, title: 'Manual mode', description: 'Center the map and make it face north (fully manual positioning)' },
+               { id: 2, title: 'Automatic mode', description: 'Try to align the map with the detected walls (one-shot, requires wall detection)' },
+               { id: 3, title: 'Continuous mode', description: 'Try to align the map with the detected walls (continuous, requires wall detection)' }];
 
 class MiniMap extends Stylable(HTMLElement) {
     // Canvas variables
@@ -27,9 +27,6 @@ class MiniMap extends Stylable(HTMLElement) {
     #pathWidth;
 
     // Floor plan variables
-    //-- Placement modes
-    #currentMode;
-    #modeSelector;
     //-- Floor plan browser
     #mapSelector;
     //-- Touch variables
@@ -70,14 +67,14 @@ class MiniMap extends Stylable(HTMLElement) {
 
         const container = editor.appendElement({ tag: 'div', className: 'container' });
         this.#editing = false;
-        [this.#editBtn, this.#modeSelector, this.#mapSelector] = container.appendElements(
+        let autoBtn;
+        [this.#editBtn, this.#mapSelector, autoBtn] = container.appendElements(
             { tag: 'div', className: 'button right', content: 'Edit' },
-            { tag: 'div', className: 'select' },
-            { tag: 'div', className: 'select incomplete', content: 'No map selected' }
+            { tag: 'div', className: 'select incomplete', content: 'No map selected' },
+            { tag: 'div', className: 'button', content: 'Auto-place' }
         );
         this.#editBtn.addEventListener('click', this.#toggleEdit.bind(this));
-        this.#modeSelector.addEventListener('click', this.#editMode.bind(this));
-        this.#setMode(MODES[0]);
+        autoBtn.addEventListener('click', this.#autoPlace.bind(this));
         this.#mapSelector.addEventListener('click', this.#browseFloorplans.bind(this));
 
         this.#mapScale = this.appendToShadow(E('map-scale'));
@@ -258,8 +255,9 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Set the floor plan placement mode
     #setMode(mode) {
-        this.#currentMode = mode.id;
-        this.#modeSelector.textContent = mode.title;
+        if (mode.id === 1) {
+            this.#resetMapTransform();
+        }
     }
 
     // Switch to edit mode
@@ -276,9 +274,9 @@ class MiniMap extends Stylable(HTMLElement) {
         }
     }
 
-    // Edit the floor plan placement mode
-    #editMode() {
-        const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 260 } });
+    // Place the floorplan automatically
+    #autoPlace() {
+        const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 280 } });
         for (const mode of MODES) {
             const choice = modal.appendElement({ tag: 'div', className: 'choice' });
             const id = `mode-${mode.id}`;
@@ -286,8 +284,6 @@ class MiniMap extends Stylable(HTMLElement) {
                 { tag: 'input', attributes: { type: 'radio', name: 'mode', id } },
                 { tag: 'label', attributes: { for: id } }
             );
-            if (this.#currentMode === mode.id)
-                radio.checked = true;
             const [title, description] = label.appendElements(
                 { tag: 'span', className: 'title', content: mode.title },
                 { tag: 'span', className: 'description', content: mode.description },
@@ -297,8 +293,8 @@ class MiniMap extends Stylable(HTMLElement) {
                 modal.remove();
             });
 
-            // TODO: implement the rest
-            if (mode.id !== 'manual') {
+            // TODO: change how this actually works
+            if (mode.id > 1) {
                 radio.disabled = true;
                 choice.classList.add('disabled');
             }
@@ -307,13 +303,35 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Browse the available floorplans
     #browseFloorplans() {
-        const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 300 } });
+        const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 330 } });
         const items = modal.appendElement({ tag: 'div', className: 'map-items' });
         const api = window.app.api();
-        jfetch(`${api}/maps?recurse`, data => {
-            for (const { name, path, anchors } of Object.values(data)) {
-                const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
+        let url = `${api}/maps?recurse`;
+        if (this.hasAttribute('latitude'))
+            url += `&latitude=${this.getAttribute('latitude')}`;
+        if (this.hasAttribute('longitude'))
+            url += `&longitude=${this.getAttribute('longitude')}`;
+        if (this.hasAttribute('altitude'))
+            url += `&altitude=${this.getAttribute('altitude')}`;
+        if (this.hasAttribute('accuracy'))
+            url += `&accuracy=${this.getAttribute('accuracy')}`;
+        if (this.hasAttribute('altitude-accuracy'))
+            url += `&altitude-accuracy=${this.getAttribute('altitude-accuracy')}`;
+        // The order is conveniently preserved by the JSON parser
+        jfetch(url, data => {
+            for (const entry of Object.values(data)) {
+                let name, path, anchors;
                 const item = items.appendElement({ tag: 'div', className: 'map-item' });
+                if ('confidence' in entry) {
+                    ({ name, path, anchors } = entry.map);
+                    if (entry.confidence == 'Invalid')
+                        item.appendElement({ tag: 'span', className: 'invalid', content: `${Math.round(entry.distance)} m` });
+                    else
+                        item.appendElement({ tag: 'span', className: 'valid' });
+                }
+                else
+                    ({ name, path, anchors } = entry);
+                const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
                 item.appendElements(
                     { tag: 'img', attributes: { src, alt: name } },
                     { tag: 'div', content: name }

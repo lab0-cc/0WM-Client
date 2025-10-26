@@ -338,11 +338,21 @@ export class App {
     }
 
     #processGPS(pos) {
-        //const crd = pos.coords;
-        //console.log("Your current position is:");
-        //console.log(`Latitude : ${crd.latitude}`);
-        //console.log(`Longitude: ${crd.longitude}`);
-        //console.log(`More or less ${crd.accuracy} meters.`);
+        const crd = pos.coords;
+        this.#miniMap.setAttribute('latitude', crd.latitude);
+        this.#miniMap.setAttribute('longitude', crd.longitude);
+        if (crd.altitude === null)
+            this.#miniMap.removeAttribute('altitude');
+        else
+            this.#miniMap.setAttribute('altitude', crd.altitude);
+        if (crd.accuracy === null)
+            this.#miniMap.removeAttribute('accuracy');
+        else
+            this.#miniMap.setAttribute('accuracy', crd.accuracy);
+        if (crd.altitudeAccuracy === null)
+            this.#miniMap.removeAttribute('altitude-accuracy');
+        else
+            this.#miniMap.setAttribute('altitude-accuracy', crd.altitudeAccuracy);
         this.#featureIndicators.update('gps', 'granted');
         this.#featureIndicators.activate('gps');
     }
