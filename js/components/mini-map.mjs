@@ -304,7 +304,6 @@ class MiniMap extends Stylable(HTMLElement) {
     // Browse the available floorplans
     #browseFloorplans() {
         const modal = document.body.appendElement({ tag: 'modal-box', attributes: { width: 330 } });
-        const items = modal.appendElement({ tag: 'div', className: 'map-items' });
         const api = window.app.api();
         let url = `${api}/maps?recurse`;
         if (this.hasAttribute('latitude'))
@@ -319,30 +318,38 @@ class MiniMap extends Stylable(HTMLElement) {
             url += `&altitude-accuracy=${this.getAttribute('altitude-accuracy')}`;
         // The order is conveniently preserved by the JSON parser
         jfetch(url, data => {
-            for (const entry of Object.values(data)) {
-                let name, path, anchors;
-                const item = items.appendElement({ tag: 'div', className: 'map-item' });
-                if ('confidence' in entry) {
-                    ({ name, path, anchors } = entry.map);
-                    if (entry.confidence == 'Invalid')
-                        item.appendElement({ tag: 'span', className: 'invalid', content: `${Math.round(entry.distance)} m` });
+            const entries = Object.entries(data);
+            if (entries.length === 0) {
+                modal.appendElement({ tag: 'div', className: 'message', content: 'No floorplan found' });
+            }
+            else {
+                const items = modal.appendElement({ tag: 'div', className: 'map-items' });
+                for (const [id, entry] of entries) {
+                    let name, path, anchors;
+                    const item = items.appendElement({ tag: 'div', className: 'map-item' });
+                    if ('confidence' in entry) {
+                        ({ name, path, anchors } = entry.map);
+                        if (entry.confidence == 'Invalid')
+                            item.appendElement({ tag: 'span', className: 'invalid', content: `${Math.round(entry.distance)} m` });
+                        else
+                            item.appendElement({ tag: 'span', className: 'valid' });
+                    }
                     else
-                        item.appendElement({ tag: 'span', className: 'valid' });
+                        ({ name, path, anchors } = entry);
+                    const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
+                    item.appendElements(
+                        { tag: 'img', attributes: { src, alt: name } },
+                        { tag: 'div', content: name }
+                    );
+                    item.addEventListener('click', () => {
+                        this.#projectMap(anchors);
+                        this.#mapID = id;
+                        this.#mapImage.src = `${api}/${path}`;
+                        this.#mapSelector.textContent = name;
+                        this.#mapSelector.classList.remove('incomplete');
+                        modal.remove();
+                    })
                 }
-                else
-                    ({ name, path, anchors } = entry);
-                const src = `${api}/${path.replace(/\.([^.]+)$/, '_thumb.$1')}`;
-                item.appendElements(
-                    { tag: 'img', attributes: { src, alt: name } },
-                    { tag: 'div', content: name }
-                );
-                item.addEventListener('click', () => {
-                    this.#projectMap(anchors);
-                    this.#mapImage.src = `${api}/${path}`;
-                    this.#mapSelector.textContent = name;
-                    this.#mapSelector.classList.remove('incomplete');
-                    modal.remove();
-                })
             }
         });
     }

@@ -190,6 +190,11 @@
     cursor: pointer;
 }
 
+:host > .inner > .message {
+    text-align: center;
+    padding: 5px;
+}
+
 :host > .inner > .map-items {
     width: calc(100% + 50px);
     position: relative;
