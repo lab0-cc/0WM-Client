@@ -197,23 +197,22 @@ class MiniMap extends Stylable(HTMLElement) {
                 this.#mapAngle = this.#savedMapAngle + delta;
                 const fromHalf = anchors[0].from.plus(fromV.scaled(.5));
                 const toHalf = anchors[0].to.plus(toV.scaled(.5));
-                this.#mapOrigin = toHalf.plus(fromHalf.to(this.#savedMapOrigin)
-                                        .rotated(new Angle2(delta)));
+                this.#mapOrigin = toHalf.plus(fromHalf.to(this.#savedMapOrigin).rotated(new Angle2(delta)));
                 break;
         }
         this.#redraw();
     }
 
     // Resize the viewport depending on the displayed elements
-    #updateViewport(viewport = null, ratio = 1) {
+    #updateViewport(viewport = null) {
         let scale;
         if (viewport === null) {
             scale = 20;
         }
         else {
             this.#center = viewport.center();
-            scale = Math.min(20, .8 * this.#canvas.width / (ratio * viewport.width()),
-                                 .8 * this.#canvas.height / (ratio * viewport.height()));
+            scale = Math.min(20, .8 * this.#canvas.clientWidth / viewport.width(),
+                                 .8 * this.#canvas.clientHeight / viewport.height());
         }
         if (this.#scale !== scale) {
             this.#scale = scale;
@@ -223,8 +222,8 @@ class MiniMap extends Stylable(HTMLElement) {
 
     // Transform a point from the viewport to global coordinates
     #scaleFromViewport(p) {
-        return new Point2(this.#center.x + (p.x - this.#canvas.width / 2) / this.#scale,
-                          this.#center.y + (p.y - this.#canvas.height / 2) / this.#scale);
+        return new Point2(this.#center.x + (p.x - this.#canvas.clientWidth / 2) / this.#scale,
+                          this.#center.y + (p.y - this.#canvas.clientHeight / 2) / this.#scale);
     }
 
     // Zoom the minimap
@@ -357,9 +356,8 @@ class MiniMap extends Stylable(HTMLElement) {
     // Draw the scene on the minimap
     draw(orientation, path, walls=[]) {
         // Precompute the viewport dimensions
-        const ratio = window.devicePixelRatio || 1;
-        this.#updateViewport(new Polygon2(path.concat(walls.flat())).boundingBox(), ratio);
-        const scale = this.#scale * ratio;
+        this.#updateViewport(new Polygon2(path.concat(walls.flat())).boundingBox());
+        const scale = this.#scale * (window.devicePixelRatio || 1);
 
         // Save the current data for redraws
         this.#savedOrientation = orientation;
