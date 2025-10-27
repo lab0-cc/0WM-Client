@@ -33,8 +33,12 @@ class MiniMap extends Stylable(HTMLElement) {
     #trackedTouches;
     #additionalTouches;
     //-- Technical variables
+    #mapID;
     #mapImage;
     #mapTransform;
+    #dLng;
+    #dLat;
+    #worldOrigin;
     #mapOrigin;
     #savedMapOrigin;
     #mapAngle;
@@ -265,6 +269,7 @@ class MiniMap extends Stylable(HTMLElement) {
             this.#editing = false;
             this.#editBtn.classList.remove('selected');
             this.#editBtn.textContent = "Edit";
+            this.#refreshMetadata();
         }
         else {
             this.#editing = true;
@@ -459,6 +464,20 @@ class MiniMap extends Stylable(HTMLElement) {
         this.#mapAngle = 0;
         this.#savedMapAngle = this.#mapAngle;
         this.#redraw();
+        this.#refreshMetadata();
+    }
+
+    // Refresh the server-side metadata for the current measurement run
+    #refreshMetadata() {
+        // TODO: Implement Matrix3 and use it here
+        const mat = new Matrix2(1, new Angle2(this.#mapAngle)).mul(new Matrix2(this.#dLng, 0, 0, -this.#dLat));
+        const origin = new Matrix2(1, new Angle2(this.#mapAngle)).appliedTo(new Vector2(-this.#worldOrigin.x, this.#worldOrigin.y)).plus(this.#mapOrigin);
+        window.app.sendWS('META', {
+            map: this.#mapID,
+            transform: { a: mat.a, b: mat.b, c: origin.x,
+                         d: mat.c, e: mat.d, f: origin.y,
+                         g: 0,     h: 0,     i: 1 }
+        });
     }
 
     // Project the map onto the local viewport
@@ -466,24 +485,25 @@ class MiniMap extends Stylable(HTMLElement) {
         const phi = Angle2.deg2rad(anchors[0].lat);
 
         // https://gis.stackexchange.com/a/75535
-        const dLng = 111412.877331 * Math.cos(phi) - 93.504117 * Math.cos(3 * phi)
+        this.#dLng = 111412.877331 * Math.cos(phi) - 93.504117 * Math.cos(3 * phi)
                    + 0.117744 * Math.cos(5 * phi) - .000165 * Math.cos(7 * phi);
-        const dLat = 111132.95255 - 559.84957 * Math.cos(2 * phi) + 1.17514 * Math.cos(4 * phi)
+        this.#dLat = 111132.95255 - 559.84957 * Math.cos(2 * phi) + 1.17514 * Math.cos(4 * phi)
                    - .00230 * Math.cos(6 * phi);
+        const origin = new Point2(anchors[0].lng * this.#dLng, anchors[0].lat * this.#dLat);
 
         const p = new Point2(anchors[0]);
         const srcV = p.to(anchors[1]);
         const srcV2 = p.to(anchors[2]);
-        const dstV = new Vector2((anchors[1].lng - anchors[0].lng) * dLng,
-                                 (anchors[1].lat - anchors[0].lat) * dLat);
-        const dstV2 = new Vector2((anchors[2].lng - anchors[0].lng) * dLng,
-                                  (anchors[2].lat - anchors[0].lat) * dLat);
+        const dstV = origin.to(new Point2(anchors[1].lng * this.#dLng, anchors[1].lat * this.#dLat));
+        const dstV2 = origin.to(new Point2(anchors[2].lng * this.#dLng, anchors[2].lat * this.#dLat));
         const det = srcV.cross(srcV2);
 
         this.#mapTransform = new Matrix2((dstV.x * srcV2.y - dstV2.x * srcV.y) / det,
                                          (dstV2.x * srcV.x - dstV.x * srcV2.x) / det,
                                          (dstV2.y * srcV.y - dstV.y * srcV2.y) / det,
                                          (dstV.y * srcV2.x - dstV2.y * srcV.x) / det);
+        const delta = this.#mapTransform.appliedTo(p);
+        this.#worldOrigin = origin.plus(new Vector2(-delta.x, delta.y));
     }
 }
 
