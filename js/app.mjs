@@ -46,6 +46,7 @@ export class App {
         document.scene = this;
         this.#measurements = [];
         this.#uuid = null;
+        this.#ws = null;
 
         jfetch('/config.json', data => {
             this.#api = data.api;
@@ -83,7 +84,9 @@ export class App {
         this.#initAP();
     }
 
-    #sendWS(cmd, arg = null) {
+    sendWS(cmd, arg = null) {
+        if (this.#ws === null)
+            return;
         if (arg === null)
             this.#ws.send(cmd);
         else
@@ -97,7 +100,7 @@ export class App {
             this.#wsCallback(command, JSON.parse(data));
         });
         this.#ws.addEventListener('open', async () => {
-            this.#sendWS('INIT', this.#uuid);
+            this.sendWS('INIT', this.#uuid);
             this.#progressModal.completeProgress('connect-ws');
         });
         this.#ws.addEventListener('close', () => {
@@ -146,7 +149,7 @@ export class App {
         this.#apRounds = 0;
         this.#pingAP(DEFAULT_AP).catch(() => {
             this.#progressModal.errProgress(`connect-ap-${DEFAULT_AP}`);
-            this.#sendWS('NOAP');
+            this.sendWS('NOAP');
         });
     }
 
@@ -288,7 +291,7 @@ export class App {
             progress.remove();
             const {x, y, z} = this.#pose.transform.position;
             const scan = {position: {x, y, z}, timestamp: Date.now(), measurements: l.flat()};
-            this.#sendWS('SCAN', scan);
+            this.sendWS('SCAN', scan);
         });
     }
 
@@ -300,7 +303,7 @@ export class App {
                 position: new Point3(data.position),
                 texture: this.#ctx.create2DTexture(canvas, 'clamp')
             });
-            this.#sendWS('RQHT');
+            this.sendWS('RQHT');
             break;
         case 'HEAT':
             this.#miniMap.attachHeatmap(data[0], data[1]);
@@ -327,7 +330,7 @@ export class App {
                   });
               }
               else {
-                  this.#sendWS('NOAP');
+                  this.sendWS('NOAP');
               }
             })();
             break;
